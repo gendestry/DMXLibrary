@@ -1,20 +1,20 @@
-#pragma once
-#include <vector>
+// #pragma once
+// #include <vector>
 
-#include "LightPatch.h"
+// #include "LightPatch.h"
 
-class DMXUniverse
-{
-    unsigned int m_Size = 0;
-    std::vector<LightPatch> m_LightPatches;
+// class DMXUniverse
+// {
+//     unsigned int m_Size = 0;
+//     std::vector<LightPatch> m_LightPatches;
 
-public:
-    void addLightPatch(LightPatch patch);
+// public:
+//     void addLightPatch(LightPatch patch);
 
-    std::vector<uint8_t> byteValue() const;
+//     std::vector<uint8_t> byteValue() const;
 
-    LightPatch &operator[](int index);
+//     LightPatch &operator[](int index);
 
-    void printLightPatches();
-    void printByteValue() const;
-};
+//     void printLightPatches();
+//     void printByteValue() const;
+// };

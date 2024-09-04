@@ -11,10 +11,10 @@ TARGET = $(TARGET_FOLDER)/$(TARGET_NAME)
 all: $(TARGET)
 
 $(TARGET): $(SOURCE_FILES)
-	g++ $^ --std=c++17 -o $@
+	@g++ $^ --std=c++17 -o $@
 
 run: $(TARGET)
-	./$^
+	@./$^
 
 clean:
 	rm -f $(TARGET)
