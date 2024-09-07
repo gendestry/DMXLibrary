@@ -1,7 +1,7 @@
-#include <iostream>
-#include "Neki.h"
+// #include <iostream>
+// #include "Neki.h"
 
-// #include "DMXUniverse.h"
+#include "DMXUniverse.h"
 
 // struct Store
 // {
@@ -172,19 +172,26 @@
 
 int main()
 {
-    Manager manager;
+    DMXUniverse manager;
     // LightPatch *patch2 = new LightPatch("Eurolite RGBDS", {PatchUnit::COLOR_R, PatchUnit::COLOR_G, PatchUnit::COLOR_B});
     LightPatch patch("Eurolite RGBDS", {PatchUnit::COLOR_R, PatchUnit::COLOR_G, PatchUnit::COLOR_B, PatchUnit::INTENSITY, PatchUnit::STROBE});
     LightPatch patch3("Led PX", {PatchUnit::COLOR_R, PatchUnit::COLOR_G, PatchUnit::COLOR_B});
-
-    manager.addSegment(patch3);
-    manager.addSegment(patch3);
-    manager.addSegment(10, patch3);
-    manager.addSegment(patch);
+    patch[0].setValue(255);
+    // patch[0].setValue(255);
+    // manager.addSegment(1, patch3);
+    // manager.addSegment(patch3);
+    // manager.addSegment(10, patch3);
+    // manager.addSegment(patch);
     // manager.addSegment(0, &patch);
 
+    manager.addSegment(patch);
+    manager.addSegment(10, patch3);
+    manager.addSegment(5, patch);
+    manager.addSegment(patch3);
+    // manager.addSegment(patch);
+    // manager[0][1].setValue(128);
     manager.printSegments();
-    manager.printByteValue();
+    // manager.printByteValue();
 
     // Store store;
     // store.addSegment({4}, 0);

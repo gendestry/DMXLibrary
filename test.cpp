@@ -16,7 +16,7 @@ struct Seg
     }
 };
 
-struct Manager
+struct DMXUniverse
 {
     std::vector<Seg> segments;
 
@@ -141,7 +141,7 @@ struct Manager
 
 int main()
 {
-    Manager manager;
+    DMXUniverse manager;
     manager.addSegment(0, 4);
     manager.addSegment(6, 2);
     manager.addSegment(12, 5);
