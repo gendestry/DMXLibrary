@@ -2,6 +2,7 @@
 #include <vector>
 #include <string>
 #include <iostream>
+#include <unordered_map>
 
 #include "PatchUnit.h"
 
@@ -12,6 +13,7 @@ class LightPatch
     unsigned int m_Size = 0;
 
     std::vector<PatchUnit> m_patchUnits;
+    std::unordered_map<PatchUnit::PatchType, std::vector<unsigned int>> m_PatchUnitIndexes;
 
 public:
     LightPatch(std::string name = "");
@@ -25,7 +27,12 @@ public:
     std::vector<uint8_t> byteValue() const;
 
     void printPatchUnits(int offset) const;
+    void printIndexes() const;
     void printLight(int offset) const;
+
+    std::vector<std::vector<unsigned int>> operator[](PatchUnit::PatchType type) const;
+    std::vector<unsigned int *> valuesForType(PatchUnit::PatchType type);
+    inline std::string getName() const { return m_Name; }
 
     friend std::ostream &operator<<(std::ostream &os, const LightPatch &patch)
     {

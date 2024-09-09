@@ -174,23 +174,33 @@ int main()
 {
     DMXUniverse manager;
     // LightPatch *patch2 = new LightPatch("Eurolite RGBDS", {PatchUnit::COLOR_R, PatchUnit::COLOR_G, PatchUnit::COLOR_B});
-    LightPatch patch("Eurolite RGBDS", {PatchUnit::COLOR_R, PatchUnit::COLOR_G, PatchUnit::COLOR_B, PatchUnit::INTENSITY, PatchUnit::STROBE});
-    LightPatch patch3("Led PX", {PatchUnit::COLOR_R, PatchUnit::COLOR_G, PatchUnit::COLOR_B});
-    patch[0].setValue(255);
-    // patch[0].setValue(255);
-    // manager.addSegment(1, patch3);
-    // manager.addSegment(patch3);
-    // manager.addSegment(10, patch3);
-    // manager.addSegment(patch);
-    // manager.addSegment(0, &patch);
-
-    manager.addSegment(patch);
-    manager.addSegment(10, patch3);
-    manager.addSegment(5, patch);
-    manager.addSegment(patch3);
-    // manager.addSegment(patch);
-    // manager[0][1].setValue(128);
+    LightPatch eurolite("Eurolite RGBDS", {PatchUnit::COLOR_R, PatchUnit::COLOR_G, PatchUnit::COLOR_B, PatchUnit::INTENSITY, PatchUnit::STROBE});
+    LightPatch ledPx3("Led PX", {PatchUnit::COLOR_R, PatchUnit::COLOR_G, PatchUnit::COLOR_B, PatchUnit::COLOR_R, PatchUnit::COLOR_G, PatchUnit::COLOR_B, PatchUnit::COLOR_R, PatchUnit::COLOR_G, PatchUnit::COLOR_B});
+    // manager.addSegment(eurolite);
+    manager.addSegment(ledPx3);
+    manager.addSegment(ledPx3);
     manager.printSegments();
+
+    auto v = manager[1].valuesForType(PatchUnit::COLOR_R);
+
+    int i = 1;
+    for (unsigned int *val : v)
+    {
+        *val = i++;
+    }
+
+    std::vector<LightPatch *> vec = manager["Led PX"];
+    std::cout << "Led PX size: " << vec.size() << std::endl;
+
+    for (int i = 0; i < vec.size(); i++)
+    {
+        std::cout << *vec[i] << std::endl;
+        std::cout << i << " " << vec[i]->getName() << std::endl;
+    }
+    // for (LightPatch *patch : vec)
+    // {
+    //     std::cout << patch->getName() << std::endl;
+    // }
     // manager.printByteValue();
 
     // Store store;

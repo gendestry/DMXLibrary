@@ -11,8 +11,10 @@ struct PatchUnit
         COLOR_G,
         COLOR_B,
         COLOR_W,
+
         INTENSITY,
         STROBE,
+
         PAN,
         TILT,
 
@@ -40,7 +42,17 @@ struct PatchUnit
         this->value = value;
     }
 
-    std::string patchTypeString() const;
-
     void printByteValue() const;
+
+    std::string patchTypeString() const
+    {
+        static const std::string patchTypeStrings[11] = {"COLOR", "COLOR_RED", "COLOR_GREEN", "COLOR_BLUE", "COLOR_WHITE", "INTENSITY", "STROBE", "PAN", "TILT", "PAN16", "TILT16"};
+        return patchTypeStrings[type];
+    }
+
+    static std::string getTypeString(PatchType type)
+    {
+        static const std::string patchTypeStrings[11] = {"COLOR", "COLOR_RED", "COLOR_GREEN", "COLOR_BLUE", "COLOR_WHITE", "INTENSITY", "STROBE", "PAN", "TILT", "PAN16", "TILT16"};
+        return patchTypeStrings[type];
+    }
 };

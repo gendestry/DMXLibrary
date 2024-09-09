@@ -40,6 +40,7 @@ bool LightPatch::addPatchUnit(PatchUnit type)
     }
 
     m_patchUnits.push_back({type});
+    m_PatchUnitIndexes[type.type].push_back(m_patchUnits.size() - 1);
     m_Size += size;
 
     return true;
@@ -70,9 +71,39 @@ void LightPatch::printPatchUnits(int offset) const
     }
 }
 
+void LightPatch::printIndexes() const
+{
+    // for loop of desctructured map
+    for (auto &[type, indexes] : m_PatchUnitIndexes)
+    {
+        auto str = PatchUnit::getTypeString(type);
+        std::cout << str << ": ";
+        for (const auto &index : indexes)
+        {
+            std::cout << index << " ";
+        }
+        std::cout << std::endl;
+    }
+}
+
 void LightPatch::printLight(int offset) const
 {
     int s = m_Size / 8;
     std::cout << "\'" << m_Name << "': " << s << ((s == 1) ? " Channel" : " Channels") << " - Addresses [" << offset << ", " << (offset + m_Size - 1) << "]" << std::endl;
     printPatchUnits(offset);
+}
+
+std::vector<std::vector<unsigned int>> LightPatch::operator[](PatchUnit::PatchType type) const
+{
+    return {m_PatchUnitIndexes.at(type)};
+}
+
+std::vector<unsigned int *> LightPatch::valuesForType(PatchUnit::PatchType type)
+{
+    std::vector<unsigned int *> values;
+    for (const auto &index : m_PatchUnitIndexes.at(type))
+    {
+        values.push_back(&m_patchUnits[index].value);
+    }
+    return values;
 }

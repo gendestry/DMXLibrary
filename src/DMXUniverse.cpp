@@ -46,6 +46,12 @@ bool DMXUniverse::addSegment(LightPatch light)
         if (size <= MAX_SIZE)
         {
             segments.push_back({0, size, light});
+            LightPatch *l = &segments.back().light;
+            // LightPatch *l = &segments[segments.size() - 1].light;
+            std::cout << l << std::endl;
+            std::cout << "Adding segment: " << *l << std::endl;
+            ligthsByName[l->getName()].push_back(l);
+            std::cout << "Name: " << ligthsByName[l->getName()][0]->getName() << std::endl;
             fillBytesPatched(0, size);
         }
         else
@@ -63,6 +69,15 @@ bool DMXUniverse::addSegment(LightPatch light)
         if (seg.start + seg.size + size <= MAX_SIZE)
         {
             segments.push_back({seg.start + seg.size, size, light});
+            LightPatch *l = &segments.back().light;
+            std::cout << "L1: " << l << std::endl;
+            std::cout << "Adding segment: " << *l << std::endl;
+            ligthsByName[l->getName()].push_back(l);
+            LightPatch *l2 = ligthsByName[l->getName()].back();
+            std::cout << "L2: " << l2 << std::endl;
+
+            std::cout << l2->getName() << std::endl;
+
             auto &newSeg = segments[segments.size() - 1];
             fillBytesPatched(newSeg.start, newSeg.start + newSeg.size);
         }
@@ -85,6 +100,7 @@ bool DMXUniverse::addSegment(int start, LightPatch light)
         if (start + size < MAX_SIZE)
         {
             segments.push_back({start, size, light});
+            ligthsByName[light.getName()].push_back(&segments[segments.size() - 1].light);
             fillBytesPatched(start, start + size);
             return true;
         }
@@ -124,6 +140,7 @@ bool DMXUniverse::addSegment(int start, LightPatch light)
             if (current.start + current.size <= start && start + size <= next.start)
             {
                 segments.insert(segments.begin() + i + 1, {start, size, light});
+                ligthsByName[light.getName()].push_back(&segments[segments.size() - 1].light);
                 fillBytesPatched(start, start + size);
                 return true;
             }
@@ -152,6 +169,7 @@ bool DMXUniverse::addSegment(int start, LightPatch light)
             if (start + size < MAX_SIZE)
             {
                 segments.push_back({start, size, light});
+                ligthsByName[light.getName()].push_back(&segments[segments.size() - 1].light);
                 fillBytesPatched(start, start + size);
                 return true;
             }
@@ -228,6 +246,16 @@ void DMXUniverse::printByteValue() const
     }
 
     std::cout << std::endl;
+}
+
+std::vector<LightPatch *> DMXUniverse::getLightsByName(std::string name)
+{
+    return ligthsByName[name];
+}
+
+std::vector<LightPatch *> DMXUniverse::operator[](std::string name)
+{
+    return getLightsByName(name);
 }
 
 // #include "DMXUniverse.h"

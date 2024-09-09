@@ -1,5 +1,6 @@
 #pragma once
 #include <iostream>
+#include <unordered_map>
 #include "LightPatch.h"
 
 #define MAX_SIZE 512
@@ -21,6 +22,7 @@ class DMXUniverse
     };
 
     std::vector<Seg> segments;
+    std::unordered_map<std::string, std::vector<LightPatch *>> ligthsByName;
     bool isPatched[MAX_SIZE] = {false};
 
     void fillBytesPatched(int from, int to, bool value = true);
@@ -35,6 +37,9 @@ public:
 
     void printSegments();
     void printByteValue() const;
+
+    std::vector<LightPatch *> getLightsByName(std::string name);
+    std::vector<LightPatch *> operator[](std::string name);
 };
 
 // #pragma once

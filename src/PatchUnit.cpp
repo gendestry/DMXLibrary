@@ -36,12 +36,6 @@ unsigned int PatchUnit::byteSize(unsigned int value) const
     return ret;
 }
 
-std::string PatchUnit::patchTypeString() const
-{
-    static const std::string patchTypeStrings[11] = {"COLOR", "COLOR_RED", "COLOR_GREEN", "COLOR_BLUE", "COLOR_WHITE", "INTENSITY", "STROBE", "PAN", "TILT", "PAN16", "TILT16"};
-    return patchTypeStrings[type];
-}
-
 void PatchUnit::printByteValue() const
 {
     std::cout << value << "(";
