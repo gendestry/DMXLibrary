@@ -5,6 +5,9 @@
 #include <algorithm>
 #include <sstream>
 #include <cmath>
+#include <thread>
+#include <chrono>
+#include "Utils.h"
 
 const std::string colorGreen = "\x1B[32m";
 const std::string colorYellow = "\x1B[33m";
@@ -12,58 +15,6 @@ const std::string colorBlue = "\x1B[34m";
 const std::string colorReset = "\x1B[0m";
 const std::string colorDim = "\x1B[2m";
 const std::string colorItalic = "\x1B[3m";
-
-std::vector<uint8_t> toBytes(int numBytes, int number)
-{
-    std::vector<uint8_t> bytes(numBytes);
-    for (int i = 0; i < numBytes; i++)
-    {
-        bytes[numBytes - i - 1] = (number >> (i * 8)) & 0xFF;
-    }
-    return bytes;
-}
-
-int toNumber(std::vector<uint8_t> bytes)
-{
-    int number = 0;
-    int size = bytes.size();
-    for (int i = 0; i < bytes.size(); i++)
-    {
-        number |= bytes[size - i - 1] << (i * 8);
-    }
-    return number;
-}
-
-std::string padByte(int num, int pad)
-{
-    std::string str = std::to_string(num);
-    int len = str.length();
-    if (len < pad)
-    {
-        str.insert(0, pad - len, ' ');
-    }
-    return str;
-}
-
-std::string colorByRGB(int r, int g, int b, bool fg)
-{
-    std::stringstream ss;
-    ss << "\x1B[" << (fg ? 3 : 4) << "8;2;" << r << ";" << g << ";" << b << "m";
-    return ss.str();
-}
-
-std::vector<float> linearInterpolation(float start, float end, int n)
-{
-    std::vector<float> values(n);
-
-    float step = (end - start) / (n - 1);
-    for (int i = 0; i < n; i++)
-    {
-        values[i] = start + i * step;
-    }
-
-    return values;
-}
 
 enum LightPatchUnit
 {
@@ -99,6 +50,7 @@ struct Light
         std::string name;
         std::vector<LightPatchUnit> units;
         std::vector<unsigned int> offsets;
+        uint8_t *memory;
         unsigned int size = 0;
 
         // copy and move constructors
@@ -122,7 +74,46 @@ struct Light
             size = counter;
         }
 
-        unsigned int getGroupSize() const
+        std::vector<int> getValues() const
+        {
+            std::vector<int> values(units.size());
+            for (int i = 0; i < units.size(); i++)
+            {
+                auto &unit = units[i];
+                unsigned int size = LIGHT_PATCH_UNIT_SIZE(unit);
+                int value = 0;
+                for (int j = 0; j < size; j++)
+                {
+                    value |= memory[offsets[i] + size - j - 1] << (j * 8);
+                }
+                values[i] = value;
+            }
+            return values;
+        }
+
+        bool setValues(std::vector<int> values)
+        {
+            if (values.size() != units.size())
+            {
+                return false;
+            }
+
+            for (int i = 0; i < units.size(); i++)
+            {
+                if (values[i] == -1)
+                    continue;
+                auto &unit = units[i];
+                unsigned int size = LIGHT_PATCH_UNIT_SIZE(unit);
+                for (int j = 0; j < size; j++)
+                {
+                    memory[offsets[i] + size - j - 1] = (values[i] >> (j * 8)) & 0xFF;
+                }
+            }
+
+            return true;
+        }
+
+        unsigned int getGroupFootprint() const
         {
             return size;
         }
@@ -132,15 +123,30 @@ struct Light
             return units.size();
         }
 
+        std::string describe() const
+        {
+            std::stringstream ss;
+            ss << "\x1B[34m\"" << name << "\"\x1B[0m size: " << size << " {";
+            for (int i = 0; i < units.size(); i++)
+            {
+                if (i != 0)
+                    ss << ", ";
+                ss << LIGHT_PATCH_UNIT_TO_STRING(units[i]);
+            }
+            ss << "}";
+            return ss.str();
+        }
+
         std::string toString() const
         {
+            auto values = getValues();
             std::stringstream ss;
             std::cout << "\x1B[34m\"" << name << "\"\x1B[0m size: " << size << " {";
             for (int i = 0; i < units.size(); i++)
             {
                 if (i != 0)
                     ss << ", ";
-                ss << LIGHT_PATCH_UNIT_TO_STRING(units[i]) << ": " << colorDim << offsets[i] << colorReset;
+                ss << LIGHT_PATCH_UNIT_TO_STRING(units[i]) << ": " << colorDim << values[i] << colorReset;
             }
             ss << "}";
             return ss.str();
@@ -153,6 +159,7 @@ struct Light
         }
     };
 
+    // the name of the light
     std::string m_Name;
 
     // the byte values of the light
@@ -165,10 +172,7 @@ struct Light
     std::unordered_map<LightPatchUnit, std::vector<unsigned int>> m_patchMap;
 
     // map group name to group
-    std::unordered_map<std::string, Group> m_groupMap;
-
-    // map group name to group indexes
-    std::unordered_map<std::string, std::vector<unsigned int>> m_groupIndexMap;
+    std::unordered_map<std::string, std::vector<Group>> m_groupMap;
 
     Light(std::string name, std::vector<LightPatchUnit> patchUnits) : m_Name(name), m_patchID(patchUnits)
     {
@@ -187,7 +191,7 @@ struct Light
 
     Light(std::string name, Group group, unsigned int numGroups) : m_Name(name)
     {
-        m_bytes.resize(group.getGroupSize() * numGroups);
+        m_bytes.resize(group.getGroupFootprint() * numGroups);
         for (int i = 0; i < numGroups; i++)
         {
             m_patchID.insert(m_patchID.end(), group.units.begin(), group.units.end());
@@ -227,16 +231,14 @@ struct Light
     {
         if (m_groupMap.find(group.name) != m_groupMap.end())
         {
+            throw std::runtime_error("Group already exists");
             return false;
         }
 
         // check if sequence exists
-        m_groupMap.insert({group.name, group});
-
         int offset = 0;
         for (int i = 0; i < m_patchID.size(); i++)
         {
-            // LightPatchUnit unit = m_patchID[i];
             bool found = true;
             for (int j = 0; j < group.units.size(); j++)
             {
@@ -249,7 +251,9 @@ struct Light
 
             if (found)
             {
-                m_groupIndexMap[group.name].push_back(offset);
+                Group newGroup = group;
+                newGroup.memory = &m_bytes[offset];
+                m_groupMap[group.name].push_back(newGroup);
             }
             offset += LIGHT_PATCH_UNIT_SIZE(m_patchID[i]);
         }
@@ -260,32 +264,22 @@ struct Light
     // sets group values at index
     bool setGroup(std::string name, unsigned int index, std::vector<int> values)
     {
-        if (m_groupIndexMap.find(name) == m_groupIndexMap.end())
+        if (m_groupMap.find(name) == m_groupMap.end())
         {
+            throw std::runtime_error("Group not found");
             return false;
         }
-        auto &group = m_groupMap[name];
-        auto &index2 = m_groupIndexMap[name][index];
 
-        for (int i = 0; i < group.offsets.size(); i++)
-        {
-            if (values[i] == -1)
-                continue;
-            auto &unit = group.units[i];
-            unsigned int size = LIGHT_PATCH_UNIT_SIZE(unit);
-            for (int j = 0; j < size; j++)
-            {
-                m_bytes[index2 + group.offsets[i] + size - j - 1] = (values[i] >> (j * 8)) & 0xFF;
-            }
-        }
-        return true;
+        auto &group = m_groupMap[name][index];
+        return group.setValues(values);
     }
 
     // sets group values at indexes
     bool setGroup(std::string name, std::vector<unsigned int> indexes, std::vector<int> values)
     {
-        if (m_groupIndexMap.find(name) == m_groupIndexMap.end())
+        if (m_groupMap.find(name) == m_groupMap.end())
         {
+            throw std::runtime_error("Group not found");
             return false;
         }
 
@@ -298,14 +292,16 @@ struct Light
         return true;
     }
 
+    // sets all groups to values
     bool setAllGroups(std::string name, std::vector<std::vector<int>> values)
     {
-        if (m_groupIndexMap.find(name) == m_groupIndexMap.end())
+        if (m_groupMap.find(name) == m_groupMap.end())
         {
+            throw std::runtime_error("Group not found");
             return false;
         }
 
-        for (int i = 0; i < m_groupIndexMap[name].size(); i++)
+        for (int i = 0; i < m_groupMap[name].size(); i++)
         {
             if (!setGroup(name, i, values[i]))
                 return false;
@@ -314,77 +310,72 @@ struct Light
         return true;
     }
 
-    // returns int values of group at index
-    std::vector<int> getGroup(std::string name, unsigned int index)
+    // get reference to a group at index
+    Group &getGroup(std::string name, unsigned int index)
     {
-        if (m_groupIndexMap.find(name) == m_groupIndexMap.end())
+        if (m_groupMap.find(name) == m_groupMap.end())
         {
-            return std::vector<int>();
+            throw std::runtime_error("Group not found");
         }
 
-        auto &group = m_groupMap[name];
-        auto &index2 = m_groupIndexMap[name][index];
-
-        std::vector<int> values(group.getNumUnits());
-        for (int i = 0; i < group.getNumUnits(); i++)
-        {
-            auto &unit = group.units[i];
-            unsigned int size = LIGHT_PATCH_UNIT_SIZE(unit);
-            int value = 0;
-            for (int j = 0; j < size; j++)
-            {
-                value |= m_bytes[index2 + group.offsets[i] + size - j - 1] << (j * 8);
-            }
-            values[i] = value;
-        }
-        return values;
+        return m_groupMap[name][index];
     }
 
-    // returns int values of group at indexes
-    std::vector<std::vector<int>> getGroups(std::string name)
+    // get all groups at name
+    std::vector<Group> &operator[](std::string name)
     {
-        if (m_groupIndexMap.find(name) == m_groupIndexMap.end())
+        if (m_groupMap.find(name) == m_groupMap.end())
         {
-            return std::vector<std::vector<int>>();
+            throw std::runtime_error("Group not found");
         }
 
-        auto &group = m_groupMap[name];
-        std::vector<std::vector<int>> values;
-        for (int i = 0; i < m_groupIndexMap[name].size(); i++)
+        return m_groupMap[name];
+    }
+
+    // return values of all groups
+    std::vector<std::vector<int>> getGroups(std::string name)
+    {
+        if (m_groupMap.find(name) == m_groupMap.end())
         {
-            values.push_back(getGroup(name, i));
+            throw std::runtime_error("Group not found");
         }
+
+        std::vector<std::vector<int>> values;
+        for (int i = 0; i < m_groupMap[name].size(); i++)
+        {
+            values.push_back(m_groupMap[name][i].getValues());
+        }
+
         return values;
     }
 
     // apply a lambda function to a group at index
     bool applyFunctionToGroup(std::string name, unsigned int index, void (*func)(int, int, int, std::vector<std::vector<int>> &), int offset = 0)
     {
-        if (m_groupIndexMap.find(name) == m_groupIndexMap.end())
+        if (m_groupMap.find(name) == m_groupMap.end())
         {
+            throw std::runtime_error("Group not found");
             return false;
         }
 
         auto values = getGroups(name);
-        func(m_groupIndexMap[name].size(), index, offset, values);
-        setAllGroups(name, values);
-
-        return true;
+        auto &setVals = values[index];
+        func(m_groupMap[name].size(), index, offset, values);
+        return setGroup(name, index, setVals);
     }
 
     // apply a lambda function to a group at indexes
     bool applyFunctionToGroup(std::string name, std::vector<unsigned int> indexes, void (*func)(int, int, int, std::vector<std::vector<int>> &), int offset = 0)
     {
-        if (m_groupIndexMap.find(name) == m_groupIndexMap.end())
+        if (m_groupMap.find(name) == m_groupMap.end())
         {
+            throw std::runtime_error("Group not found");
             return false;
         }
 
         for (auto index : indexes)
         {
-            auto values = getGroups(name);
-            func(m_groupIndexMap[name].size(), index, offset, values);
-            if (!setAllGroups(name, values))
+            if (!applyFunctionToGroup(name, index, func, offset))
                 return false;
         }
 
@@ -394,29 +385,27 @@ struct Light
     // apply a lambda function to all groups
     bool applyFunctionToAllGroups(std::string name, void (*func)(int, int, int, std::vector<std::vector<int>> &), int offset = 0)
     {
-        if (m_groupIndexMap.find(name) == m_groupIndexMap.end())
+        if (m_groupMap.find(name) == m_groupMap.end())
         {
+            throw std::runtime_error("Group not found");
             return false;
         }
 
-        for (int i = 0; i < m_groupIndexMap[name].size(); i++)
+        for (int i = 0; i < m_groupMap[name].size(); i++)
         {
-            auto values = getGroups(name);
-            func(m_groupIndexMap[name].size(), i, offset, values);
-            if (!setAllGroups(name, values))
+            if (!applyFunctionToGroup(name, i, func, offset))
                 return false;
         }
 
         return true;
     }
 
-    // PRINTING FUNCTIONS
-    void printGroups()
+    // // PRINTING FUNCTIONS
+    void printGroups() const
     {
-        for (auto &[groupName, group] : m_groupMap)
+        for (const auto &[groupName, groups] : m_groupMap)
         {
-            // print groupindexsize
-            std::cout << " - [" << m_groupIndexMap[groupName].size() << "] " << group.toString() << std::endl;
+            std::cout << " - " << groups[0].describe() << std::endl;
         }
     }
 
@@ -434,7 +423,7 @@ struct Light
         std::cout << colorReset << std::endl;
     }
 
-    void print()
+    void print() const
     {
         std::cout << colorItalic << "[" << m_Name << "]" << colorReset << std::endl;
         std::cout << "Groups:\n";
@@ -449,13 +438,7 @@ int main()
     constexpr unsigned int NLEDS = 30;
 
     Light::Group group("RGB", {R, G, B});
-    Light light2("Bar", group, NLEDS);
-
-    auto sinLambda = [](int groupSize, int index, int offset, std::vector<std::vector<int>> &values)
-    {
-        auto &v = values[index];
-        v[0] = (int)(std::sin(M_PI * ((index + offset) % groupSize) / groupSize) * 255);
-    };
+    Light light("Led Bar", group, NLEDS);
 
     auto redBlueLambda = [](int groupSize, int index, int offset, std::vector<std::vector<int>> &values)
     {
@@ -464,82 +447,44 @@ int main()
         v[2] = (int)(std::sin(M_PI * ((index + offset + groupSize / 2) % groupSize) / groupSize) * 255);
     };
 
-    auto toggleRedLambda = [](int groupSize, int index, int offset, std::vector<std::vector<int>> &values)
-    {
-        auto &v = values[index];
-        v[0] = v[0] == 0 ? 255 : 0;
-    };
-
     auto coloriseLambda = [](int groupSize, int index, int offset, std::vector<std::vector<int>> &values)
     {
         auto &v = values[index];
         std::cout << colorByRGB(v[0], v[1], v[2], false) << "  " << colorReset;
     };
 
-    auto globalIntensityLambda = [](int groupSize, int index, int offset, std::vector<std::vector<int>> &values)
+    auto hueShiftLambda = [](int groupSize, int index, int offset, std::vector<std::vector<int>> &values)
     {
         auto &v = values[index];
-        for (int i = 0; i < v.size(); i++)
-        {
-            v[i] = std::max(20, v[i]);
-        }
+        auto hsv = rgbToHsv(v);
+        hsv[0] = fmod(hsv[0] + 5 * offset, 360.0);
+        auto rgb = hsvToRgb(hsv);
+        v[0] = rgb[0];
+        v[1] = rgb[1];
+        v[2] = rgb[2];
     };
+
+    light.applyFunctionToAllGroups("RGB", redBlueLambda);
 
     for (int i = 0; i < NLEDS; i++)
     {
-        light2.applyFunctionToAllGroups("RGB", redBlueLambda, i);
-        // light2.applyFunctionToAllGroups("RGB", redBlueLambda, i);
-        light2.applyFunctionToAllGroups("RGB", coloriseLambda);
-        std::cout << std::endl;
+        // light.applyFunctionToAllGroups("RGB", redBlueLambda, i);
+        light.applyFunctionToAllGroups("RGB", hueShiftLambda, i);
+        light.applyFunctionToAllGroups("RGB", coloriseLambda);
+        std::cout.flush();
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        std::cout << "\r";
     }
+    std::cout << std::endl;
+    light.print();
 
-    light2.print();
+    // light.applyFunctionToAllGroups("RGB", hueShiftLambda, NLEDS / 3 * 2);
+    // light["RGB"][0].setValues({255, 0, -1});
+    // light.applyFunctionToAllGroups("RGB", coloriseLambda);
 
-    // for (int i = 0; i < NLEDS; i++)
-    // {
-    //     light2.setGroup("RGB", i, {i % 3 > 0 ? 255 : 0, 0, 0});
-    // }
-
-    // light2.applyFunctionToAllGroups("RGB", coloriseLambda);
-    // light2.printBytesPatched();
     // std::cout << std::endl;
-
-    // // light2.applyFunctionToAllGroups("RGB", toggleRedLambda);
-    // // light2.applyFunctionToAllGroups("RGB", globalIntensityLambda);
-    // light2.applyFunctionToAllGroups("RGB", coloriseLambda);
-    // light2.printBytesPatched();
-
-    // light2.print();
-    // int n = 5;
-    // for (int i = 0; i < n; i++)
-    // {
-    //     std::cout << std::sin(M_PI * i / n) * 255 << ", ";
-    // }
-    // light2.addGroup(group);
-    // // light2.setGroup("RGB", 0, {0, 255, 0});
-    // // light2.setGroup("RGB", 1, {0, 255, 255});
-    // // light2.setGroup("RGB", 2, {0, 255, 0});
-    // // light2.setGroup("RGB", {1, 2}, {255, -1, -1});
-    // light2.print();
-
-    // auto lambda = [](std::vector<int> &values)
-    // {
-    //     values[1]++;
-    //     values[1]++;
-    // };
-
-    // light2.applyFunctionToGroups("RGB", {0, 1}, lambda);
-    // light2.print();
-
-    // auto groups = light2.getGroups("RGB");
-    // for (int i = 0; i < groups.size(); i++)
-    // {
-    //     for (auto &value : groups[i])
-    //     {
-    //         std::cout << value << " ";
-    //     }
-    //     std::cout << std::endl;
-    // }
+    // std::cout << light["RGB"][0].toString() << std::endl;
+    // light.print();
 
     return 0;
 }
