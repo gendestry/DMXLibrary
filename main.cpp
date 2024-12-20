@@ -1,57 +1,462 @@
 #include <iostream>
 #include <iomanip>
-#include <vector>
-#define MAX_SIZE 100
+#include <unordered_map>
+#include <thread>
+#include <chrono>
+#include "Utils.h"
 
-std::string padByte(int num, int pad)
+#define MAX_SIZE 300
+
+const std::string colorGreen = "\x1B[32m";
+const std::string colorYellow = "\x1B[33m";
+const std::string colorBlue = "\x1B[34m";
+const std::string colorReset = "\x1B[0m";
+const std::string colorDim = "\x1B[2m";
+const std::string colorItalic = "\x1B[3m";
+
+enum LightPatchUnit
 {
-    std::string str = std::to_string(num);
-    int len = str.length();
-    if (len < pad)
-    {
-        str.insert(0, pad - len, ' ');
-    }
-    return str;
-}
+    R,
+    G,
+    B,
+    Dimmer,
+    Strobo,
 
-struct Fragment
+    R16 = 100,
+    G16,
+    B16,
+    Dimmer16,
+    Strobo16
+};
+
+#define LIGHT_PATCH_UNIT_SIZE(x) (x >= R16 ? 2 : 1)
+#define LIGHT_PATCH_UNIT_TO_STRING(x) (x == R ? "R" : x == G      ? "G"        \
+                                                  : x == B        ? "B"        \
+                                                  : x == Dimmer   ? "Dimmer"   \
+                                                  : x == Strobo   ? "Strobo"   \
+                                                  : x == R16      ? "R16"      \
+                                                  : x == G16      ? "G16"      \
+                                                  : x == B16      ? "B16"      \
+                                                  : x == Dimmer16 ? "Dimmer16" \
+                                                  : x == Strobo16 ? "Strobo16" \
+                                                                  : "Unknown")
+
+struct Light
 {
-    static unsigned int idCounter;
-    static unsigned int fIdCounter;
-    unsigned int id = 0;
-    unsigned int fid = 0;
-    int start = -1;
-
-    Fragment()
+    struct Group
     {
-        id = idCounter++;
+        std::string name;
+        std::vector<LightPatchUnit> units;
+        std::vector<unsigned int> offsets;
+        uint8_t **memory;
+        int offset;
+        unsigned int size = 0;
+
+        // copy and move constructors
+        Group() = default;
+        Group(const Group &other) = default;
+        Group(Group &&other) = default;
+
+        Group(std::string name, std::vector<LightPatchUnit> units) : name(name), units(units)
+        {
+            unsigned int counter = 0;
+            for (unsigned int i = 0; i < units.size(); i++)
+            {
+                offsets.push_back(counter);
+
+                LightPatchUnit unit = units[i];
+                unsigned int unitSize = LIGHT_PATCH_UNIT_SIZE(unit);
+
+                counter += unitSize;
+            }
+
+            size = counter;
+        }
+
+        std::vector<int> getValues() const
+        {
+            std::vector<int> values(units.size());
+            for (int i = 0; i < units.size(); i++)
+            {
+                auto &unit = units[i];
+                unsigned int size = LIGHT_PATCH_UNIT_SIZE(unit);
+                int value = 0;
+                for (int j = 0; j < size; j++)
+                {
+                    value |= (*memory)[offset + offsets[i] + size - j - 1] << (j * 8);
+                }
+                values[i] = value;
+            }
+            return values;
+        }
+
+        bool setValues(std::vector<int> values)
+        {
+            if (values.size() != units.size())
+            {
+                return false;
+            }
+
+            for (int i = 0; i < units.size(); i++)
+            {
+                if (values[i] == -1)
+                    continue;
+                auto &unit = units[i];
+                unsigned int size = LIGHT_PATCH_UNIT_SIZE(unit);
+                for (int j = 0; j < size; j++)
+                {
+                    (*memory)[offset + offsets[i] + size - j - 1] = (values[i] >> (j * 8)) & 0xFF;
+                }
+            }
+
+            return true;
+        }
+
+        unsigned int getGroupFootprint() const
+        {
+            return size;
+        }
+
+        unsigned int getNumUnits() const
+        {
+            return units.size();
+        }
+
+        std::string describe() const
+        {
+            std::stringstream ss;
+            ss << "\x1B[34m\"" << name << "\"\x1B[0m size: " << size << " {";
+            for (int i = 0; i < units.size(); i++)
+            {
+                if (i != 0)
+                    ss << ", ";
+                ss << LIGHT_PATCH_UNIT_TO_STRING(units[i]);
+            }
+            ss << "}";
+            return ss.str();
+        }
+
+        std::string toString() const
+        {
+            auto values = getValues();
+            std::stringstream ss;
+            std::cout << "\x1B[34m\"" << name << "\"\x1B[0m size: " << size << " {";
+            for (int i = 0; i < units.size(); i++)
+            {
+                if (i != 0)
+                    ss << ", ";
+                ss << LIGHT_PATCH_UNIT_TO_STRING(units[i]) << ": " << colorDim << values[i] << colorReset;
+            }
+            ss << "}";
+            return ss.str();
+        }
+
+        friend std::ostream &operator<<(std::ostream &os, const Group &group)
+        {
+            os << group.toString();
+            return os;
+        }
+    };
+
+    // the name of the light
+    std::string m_Name;
+
+    // the byte values of the light
+    uint8_t *m_bytes;
+    unsigned int m_size;
+
+    // the description of the light patches
+    std::vector<LightPatchUnit> m_patchID;
+
+    // map patch unit to indexes
+    std::unordered_map<LightPatchUnit, std::vector<unsigned int>> m_patchMap;
+
+    // map group name to group
+    std::unordered_map<std::string, std::vector<Group>> m_groupMap;
+
+    unsigned int start = 0;
+
+    Light(std::string name, std::vector<LightPatchUnit> patchUnits) : m_Name(name), m_patchID(patchUnits)
+    {
+        unsigned int counter = 0;
+        for (unsigned int i = 0; i < patchUnits.size(); i++)
+        {
+            LightPatchUnit unit = patchUnits[i];
+            unsigned int size = LIGHT_PATCH_UNIT_SIZE(unit);
+
+            m_patchMap[unit].push_back(counter);
+            counter += size;
+        }
+
+        m_size = counter;
     }
 
-    virtual Fragment *clone() const = 0;
-    virtual unsigned int getSize() const = 0;
-    virtual std::vector<uint8_t> getBytes() const = 0;
-
-    virtual std::string toString() const
+    Light(std::string name, Group group, unsigned int numGroups) : m_Name(name)
     {
-        return "[ " + std::to_string(id) + " ]" + "Start: " + std::to_string(start) + " Size: " + std::to_string(getSize());
+        m_size = group.getGroupFootprint() * numGroups;
+        for (int i = 0; i < numGroups; i++)
+        {
+            m_patchID.insert(m_patchID.end(), group.units.begin(), group.units.end());
+        }
+
+        unsigned int counter = 0;
+        for (int i = 0; i < numGroups; i++)
+        {
+            for (int j = 0; j < group.getNumUnits(); j++)
+            {
+                LightPatchUnit unit = group.units[j];
+                unsigned int size = LIGHT_PATCH_UNIT_SIZE(unit);
+                m_patchMap[unit].push_back(counter);
+                counter += size;
+            }
+        }
+
+        addGroup(group);
+    }
+
+    inline const unsigned int getSize() const { return m_size; }
+
+    inline uint8_t *getBytes() const { return m_bytes; }
+
+    // sets all unit patches of the light to a value
+    void set(LightPatchUnit unit, int value)
+    {
+        auto &indices = m_patchMap[unit];
+        unsigned int size = LIGHT_PATCH_UNIT_SIZE(unit);
+        for (auto &index : indices)
+        {
+            for (int i = 0; i < size; i++)
+            {
+                m_bytes[index + size - i - 1] = (value >> (i * 8)) & 0xFF;
+            }
+        }
+    }
+
+    // adds a custom indexing group
+    bool addGroup(Group group)
+    {
+        if (m_groupMap.find(group.name) != m_groupMap.end())
+        {
+            throw std::runtime_error("Group already exists");
+            return false;
+        }
+
+        // check if sequence exists
+        int offset = 0;
+        for (int i = 0; i < m_patchID.size(); i++)
+        {
+            bool found = true;
+            for (int j = 0; j < group.units.size(); j++)
+            {
+                if (m_patchID[i + j] != group.units[j])
+                {
+                    found = false;
+                    break;
+                }
+            }
+
+            if (found)
+            {
+                Group newGroup = group;
+                newGroup.memory = &m_bytes;
+                newGroup.offset = offset;
+                m_groupMap[group.name].push_back(newGroup);
+            }
+            offset += LIGHT_PATCH_UNIT_SIZE(m_patchID[i]);
+        }
+
+        return true;
+    }
+
+    // sets group values at index
+    bool setGroup(std::string name, unsigned int index, std::vector<int> values)
+    {
+        if (m_groupMap.find(name) == m_groupMap.end())
+        {
+            throw std::runtime_error("Group not found");
+            return false;
+        }
+
+        auto &group = m_groupMap[name][index];
+        return group.setValues(values);
+    }
+
+    // sets group values at indexes
+    bool setGroup(std::string name, std::vector<unsigned int> indexes, std::vector<int> values)
+    {
+        if (m_groupMap.find(name) == m_groupMap.end())
+        {
+            throw std::runtime_error("Group not found");
+            return false;
+        }
+
+        for (auto index : indexes)
+        {
+            if (!setGroup(name, index, values))
+                return false;
+        }
+
+        return true;
+    }
+
+    // sets all groups to values
+    bool setAllGroups(std::string name, std::vector<std::vector<int>> values)
+    {
+        if (m_groupMap.find(name) == m_groupMap.end())
+        {
+            throw std::runtime_error("Group not found");
+            return false;
+        }
+
+        for (int i = 0; i < m_groupMap[name].size(); i++)
+        {
+            if (!setGroup(name, i, values[i]))
+                return false;
+        }
+
+        return true;
+    }
+
+    // get reference to a group at index
+    Group &getGroup(std::string name, unsigned int index)
+    {
+        if (m_groupMap.find(name) == m_groupMap.end())
+        {
+            throw std::runtime_error("Group not found");
+        }
+
+        return m_groupMap[name][index];
+    }
+
+    // get all groups at name
+    std::vector<Group> &operator[](std::string name)
+    {
+        if (m_groupMap.find(name) == m_groupMap.end())
+        {
+            throw std::runtime_error("Group not found");
+        }
+
+        return m_groupMap[name];
+    }
+
+    // return values of all groups
+    std::vector<std::vector<int>> getGroups(std::string name)
+    {
+        if (m_groupMap.find(name) == m_groupMap.end())
+        {
+            throw std::runtime_error("Group not found");
+        }
+
+        std::vector<std::vector<int>> values;
+        for (int i = 0; i < m_groupMap[name].size(); i++)
+        {
+            values.push_back(m_groupMap[name][i].getValues());
+        }
+
+        return values;
+    }
+
+    // apply a lambda function to a group at index
+    bool applyFunctionToGroup(std::string name, unsigned int index, void (*func)(int, int, int, std::vector<std::vector<int>> &), int offset = 0)
+    {
+        if (m_groupMap.find(name) == m_groupMap.end())
+        {
+            throw std::runtime_error("Group not found");
+            return false;
+        }
+
+        auto values = getGroups(name);
+        auto &setVals = values[index];
+        func(m_groupMap[name].size(), index, offset, values);
+        return setGroup(name, index, setVals);
+    }
+
+    // apply a lambda function to a group at indexes
+    bool applyFunctionToGroup(std::string name, std::vector<unsigned int> indexes, void (*func)(int, int, int, std::vector<std::vector<int>> &), int offset = 0)
+    {
+        if (m_groupMap.find(name) == m_groupMap.end())
+        {
+            throw std::runtime_error("Group not found");
+            return false;
+        }
+
+        for (auto index : indexes)
+        {
+            if (!applyFunctionToGroup(name, index, func, offset))
+                return false;
+        }
+
+        return true;
+    }
+
+    // apply a lambda function to all groups
+    bool applyFunctionToAllGroups(std::string name, void (*func)(int, int, int, std::vector<std::vector<int>> &), int offset = 0)
+    {
+        if (m_groupMap.find(name) == m_groupMap.end())
+        {
+            throw std::runtime_error("Group not found");
+            return false;
+        }
+
+        for (int i = 0; i < m_groupMap[name].size(); i++)
+        {
+            if (!applyFunctionToGroup(name, i, func, offset))
+                return false;
+        }
+
+        return true;
+    }
+
+    std::string toString() const
+    {
+        std::stringstream ss;
+        ss << colorItalic << m_Name << colorReset << std::endl;
+        ss << "Groups:\n";
+        for (const auto &[groupName, groups] : m_groupMap)
+        {
+            ss << " - " << groups[0].describe() << std::endl;
+        }
+        return ss.str();
+    }
+
+    // // PRINTING FUNCTIONS
+    void printGroups() const
+    {
+        for (const auto &[groupName, groups] : m_groupMap)
+        {
+            std::cout << " - " << groups[0].describe() << std::endl;
+        }
+    }
+
+    void printBytesPatched() const
+    {
+        std::cout << colorDim;
+        for (int i = 0; i < m_size; i++)
+        {
+            if (i % 16 == 0)
+                std::cout << std::endl;
+
+            std::cout << padByte(m_bytes[i], 3) << " ";
+        }
+
+        std::cout << colorReset << std::endl;
+    }
+
+    void print() const
+    {
+        std::cout << colorItalic << "[" << m_Name << "]" << colorReset << std::endl;
+        std::cout << "Groups:\n";
+        printGroups();
+        std::cout << "Bytes:";
+        printBytesPatched();
     }
 };
 
-unsigned int Fragment::idCounter = 0;
-unsigned int Fragment::fIdCounter = 0;
-
 struct FragmentedMemory
 {
-    std::vector<Fragment *> m_Fragments;
+    std::vector<Light> m_Lights;
+    uint8_t m_bytes[MAX_SIZE] = {0};
     unsigned int bytesPatched[MAX_SIZE] = {0};
-
-    ~FragmentedMemory()
-    {
-        for (auto &f : m_Fragments)
-        {
-            delete f;
-        }
-    }
 
     void fillBytesPatched(int start, int end)
     {
@@ -64,18 +469,18 @@ struct FragmentedMemory
         num++;
     }
 
-    bool add(Fragment &fragment, int start = -1)
+    bool add(Light &fragment, int start = -1)
     {
-
-        if (m_Fragments.empty())
+        if (m_Lights.empty())
         {
             int size = fragment.getSize();
             if (size <= MAX_SIZE)
             {
-                Fragment *f = fragment.clone();
-                f->start = 0;
-                m_Fragments.push_back(f);
-                fillBytesPatched(0, size);
+                unsigned int startOffset = start == -1 ? 0 : start;
+                fragment.start = startOffset;
+                fragment.m_bytes = &m_bytes[startOffset];
+                m_Lights.push_back(fragment);
+                fillBytesPatched(startOffset, startOffset + size);
                 return true;
             }
             else
@@ -88,63 +493,49 @@ struct FragmentedMemory
         // insert next
         if (start == -1)
         {
-            auto &frag = m_Fragments[m_Fragments.size() - 1];
+            auto &frag = m_Lights[m_Lights.size() - 1];
 
-            //     // if segment fits at end
-            if (frag->start + frag->getSize() + fragment.getSize() <= MAX_SIZE)
+            // if segment fits at end
+            if (frag.start + frag.getSize() + fragment.getSize() <= MAX_SIZE)
             {
-                Fragment *f = fragment.clone();
-                f->start = frag->start + frag->getSize();
-                m_Fragments.push_back(f);
-                //         std::cout << frag << std::endl;
-                //         // LightPatch *l = &segments.back().light;
-                //         // std::cout << "L1: " << l << std::endl;
-                //         // std::cout << "Adding segment: " << *l << std::endl;
-                //         // ligthsByName[l->getName()].push_back(l);
-                //         // LightPatch *l2 = ligthsByName[l->getName()].back();
-                //         // std::cout << "L2: " << l2 << std::endl;
-
-                //         // std::cout << l2->getName() << std::endl;
-
-                //         // auto &newSeg = segments[segments.size() - 1];
-                fillBytesPatched(f->start, f->start + f->getSize());
+                fragment.start = frag.start + frag.getSize();
+                fragment.m_bytes = &m_bytes[fragment.start];
+                m_Lights.push_back(fragment);
+                fillBytesPatched(fragment.start, fragment.start + fragment.getSize());
                 return true;
             }
         }
         else
         {
             unsigned int size = fragment.getSize();
-            for (int i = 0; i < m_Fragments.size(); i++)
+            for (int i = 0; i < m_Lights.size(); i++)
             {
 
-                auto &current = m_Fragments[i];
+                auto &current = m_Lights[i];
                 // std::cout << "Current: " << current << std::endl;
-                // std::cout << "i: " << i << ", Segment size: " << m_Fragments.size() << std::endl;
+                // std::cout << "i: " << i << ", Segment size: " << m_Lights.size() << std::endl;
 
                 // not last segment
-                if (i < m_Fragments.size() - 1)
+                if (i < m_Lights.size() - 1)
                 {
                     // std::cout << "here" << std::endl;
-                    auto &next = m_Fragments[i + 1];
-                    // std::cout << "current: " << current->start << ", " << current->size << std::endl;
-                    // std::cout << "next   : " << next->start << ", " << next->size << std::endl;
-                    // std::cout << "other  : " << start << ", " << size << std::endl;
-                    if (start >= current->start && start < current->start + current->getSize())
+                    auto &next = m_Lights[i + 1];
+                    if (start >= current.start && start < current.start + current.getSize())
                     {
                         std::cout << "Segment within bounds" << std::endl;
                         return false;
                     }
                     // same for next
-                    if (start >= next->start && start < next->start + next->getSize())
+                    if (start >= next.start && start < next.start + next.getSize())
                     {
                         std::cout << "Segment within bounds" << std::endl;
                         return false;
                     }
-                    if (current->start + current->getSize() <= start && start + size <= next->start)
+                    if (current.start + current.getSize() <= start && start + size <= next.start)
                     {
-                        Fragment *f = fragment.clone();
-                        f->start = start;
-                        m_Fragments.insert(m_Fragments.begin() + i + 1, f);
+                        fragment.start = start;
+                        fragment.m_bytes = &m_bytes[fragment.start];
+                        m_Lights.insert(m_Lights.begin() + i + 1, fragment);
                         fillBytesPatched(start, start + size);
                         return true;
                     }
@@ -158,7 +549,7 @@ struct FragmentedMemory
                     // check if segment within current segment bounds
                     // std::cout << current->start << ", " << current->size << std::endl;
                     // std::cout << start << ", " << size << std::endl;
-                    if (start >= current->start && start < current->start + current->getSize())
+                    if (start >= current.start && start < current.start + current.getSize())
                     {
                         std::cout << "Segment within bounds 1" << std::endl;
                         return false;
@@ -172,9 +563,9 @@ struct FragmentedMemory
 
                     if (start + size <= MAX_SIZE)
                     {
-                        Fragment *f = fragment.clone();
-                        f->start = start;
-                        m_Fragments.push_back(f);
+                        fragment.start = start;
+                        fragment.m_bytes = &m_bytes[fragment.start];
+                        m_Lights.push_back(fragment);
                         // ligthsByName[light.getName()].push_back(&segments[segments.size() - 1].light);
                         fillBytesPatched(start, start + size);
                         return true;
@@ -191,105 +582,87 @@ struct FragmentedMemory
         return false;
     }
 
+    Light &operator[](int index)
+    {
+        if (index < 0 || index >= m_Lights.size())
+        {
+            throw std::runtime_error("Index out of bounds");
+        }
+        return m_Lights[index];
+    }
+
     std::vector<uint8_t> getBytes() const
     {
         std::vector<uint8_t> bytes(MAX_SIZE, 0);
         int index = 0;
-        for (int i = 0; i < m_Fragments.size(); i++)
+        for (int i = 0; i < m_Lights.size(); i++)
         {
-            auto &curr = m_Fragments[i];
-            const auto &currBytes = curr->getBytes();
-            for (int j = curr->start; j < curr->start + curr->getSize(); j++)
+            const auto &curr = m_Lights[i];
+            uint8_t *currBytes = curr.getBytes();
+
+            for (int j = curr.start; j < curr.start + curr.getSize(); j++)
             {
-                bytes[j] = currBytes[j - curr->start];
+                bytes[j] = currBytes[j - curr.start];
             }
         }
 
         return bytes;
     }
 
-    std::vector<Fragment *> getFragmentsById(unsigned int id) const
-    {
-        std::vector<Fragment *> fragments;
-        for (auto &f : m_Fragments)
-        {
-            if (f->id == id)
-            {
-                fragments.push_back(f);
-            }
-        }
-
-        return fragments;
-    }
-
-    std::vector<Fragment *> operator[](unsigned int id)
-    {
-        return getFragmentsById(id);
-    }
-
-    void printFragments()
+    void printFragments() const
     {
         // std::cout << "Segments: " << segments.size() << std::endl;
-        for (int i = 0; i < m_Fragments.size(); i++)
+        for (int i = 0; i < m_Lights.size(); i++)
         {
             const int offset = 0;
-            auto &curr = m_Fragments[i];
-            int cstart = curr->start;
-            int cnext = curr->start + curr->getSize();
-            int cend = curr->start + curr->getSize() - 1;
+            auto &curr = m_Lights[i];
+            int cstart = curr.start;
+            int cnext = curr.start + curr.getSize();
+            int cend = curr.start + curr.getSize() - 1;
 
             if (cstart != 0 && i == 0)
             {
-                std::cout << "[" << std::setw(3) << 0 + offset << ", " << std::setw(3) << (cstart - 1 + offset) << "]" << " Empty" << std::endl;
+                printf("[%3d, %3d] Empty\n", 0 + offset, cstart - 1 + offset);
+                // std::cout << "[" << std::setw(3) << 0 + offset << ", " << std::setw(3) << (cstart - 1 + offset) << "]"
+                //           << " Empty" << std::endl;
             }
 
-            std::cout << "[" << std::setw(3) << (curr->start + offset) << ", " << std::setw(3) << (curr->start + curr->getSize() - 1 + offset) << "] " << curr->toString() << std::endl;
+            printf("[%3d, %3d] %s\n", cstart + offset, cend + offset, curr.toString().c_str());
+            // std::cout << "[" << std::setw(3) << (curr.start + offset) << ", " << std::setw(3) << (curr.start + curr.getSize() - 1 + offset) << "] " << curr.toString() << std::endl;
 
-            if (i < m_Fragments.size() - 1)
+            if (i < m_Lights.size() - 1)
             {
-                auto &next = m_Fragments[i + 1];
-                if (curr->start + curr->getSize() != next->start)
+                auto &next = m_Lights[i + 1];
+                if (curr.start + curr.getSize() != next.start)
                 {
-                    std::cout << "[" << std::setw(3) << (curr->start + curr->getSize() + offset) << ", " << std::setw(3) << (next->start - 1 + offset) << "]" << " Empty" << std::endl;
+                    printf("[%3d, %3d] Empty\n", cnext + offset, next.start - 1 + offset);
+                    // std::cout << "[" << std::setw(3) << (curr.start + curr.getSize() + offset) << ", " << std::setw(3) << (next.start - 1 + offset) << "]"
+                    //           << " Empty" << std::endl;
                     continue;
                 }
             }
             else
             {
-                if (curr->start + curr->getSize() < MAX_SIZE)
+                if (curr.start + curr.getSize() < MAX_SIZE)
                 {
-                    std::cout << "[" << std::setw(3) << (curr->start + curr->getSize() + offset) << ", " << std::setw(3) << (MAX_SIZE - 1 + offset) << "]" << " Empty" << std::endl;
+                    printf("[%3d, %3d] Empty\n", cnext + offset, MAX_SIZE - 1 + offset);
+                    // std::cout << "[" << std::setw(3) << (curr.start + curr.getSize() + offset) << ", " << std::setw(3) << (MAX_SIZE - 1 + offset) << "]"
+                    //           << " Empty" << std::endl;
                     continue;
                 }
             }
         }
     }
 
-    void printFragmentsWithId(unsigned int id)
-    {
-        std::vector<Fragment *> fragments = getFragmentsById(id);
-
-        for (int i = 0; i < fragments.size(); i++)
-        {
-            const int offset = 0;
-            auto &curr = fragments[i];
-            std::cout << "[" << std::setw(3) << (curr->start + offset) << ", " << std::setw(3) << (curr->start + curr->getSize() - 1 + offset) << "] " << curr->toString() << std::endl;
-        }
-    }
-
     void printBytes() const
     {
-
-        // const std::string color2 = "\x1B[38;2;0;110;70m";
-        // const std::string color = "\x1B[38;2;60;240;180m";
-        const std::string color = "\x1B[32m";
-        const std::string color2 = "\x1B[33m";
+        std::vector<float> colorVecHsv = {110.0f, 0.7f, 1.0f};
         const std::string reset = "\x1B[0m";
         std::vector<uint8_t> bytes = getBytes();
+
         std::cout << "Bytes: \n";
 
         unsigned int prevByteColor = 0;
-        bool colorToggle = false;
         std::string col = reset;
 
         std::cout << "\x1B[3m";
@@ -303,6 +676,7 @@ struct FragmentedMemory
 
         std::cout << std::dec << reset << std::endl;
 
+        // print seperator
         for (int i = 0; i < cond; i++)
         {
             std::cout << "----";
@@ -319,9 +693,11 @@ struct FragmentedMemory
             {
                 if (prevByteColor != bytesPatched[i])
                 {
-                    colorToggle = !colorToggle;
+                    auto colorVec = hsvToRgb(colorVecHsv);
+                    col = colorByRGB(colorVec[0], colorVec[1], colorVec[2], true);
+                    colorVecHsv[0] = fmod(colorVecHsv[0] + 55, 360.0f);
+
                     prevByteColor = bytesPatched[i];
-                    col = colorToggle ? color : color2;
                 }
             }
             else
@@ -335,134 +711,91 @@ struct FragmentedMemory
     }
 };
 
-struct Col : public Fragment
-{
-    uint8_t r, g, b;
-    std::string name;
-
-    Col() = default;
-    Col(uint8_t r, uint8_t g, uint8_t b, std::string name = "RGB") : r(r), g(g), b(b), name(name) {}
-
-    Fragment *clone() const override
-    {
-        return new Col(*this);
-    }
-
-    unsigned int getSize() const override
-    {
-        return 3;
-    }
-
-    std::vector<uint8_t> getBytes() const override
-    {
-        return {r, g, b};
-    }
-
-    std::string toString() const override
-    {
-        return Fragment::toString() + ": " + name + "(" + std::to_string(r) + ", " + std::to_string(g) + ", " + std::to_string(b) + ")";
-    }
-
-    friend std::ostream &operator<<(std::ostream &os, const Col &col)
-    {
-        os << col.toString();
-        return os;
-    }
-};
-
-struct LedPAR : public Fragment
-{
-    uint8_t r, g, b, dim, strobo;
-    std::string name = "LedPAR";
-
-    LedPAR() = default;
-    LedPAR(uint8_t r, uint8_t g, uint8_t b, uint8_t dim, uint8_t strobo) : r(r), g(g), b(b), dim(dim), strobo(strobo) {}
-
-    Fragment *clone() const override
-    {
-        return new LedPAR(*this);
-    }
-
-    unsigned int getSize() const override
-    {
-        return 5;
-    }
-
-    std::vector<uint8_t> getBytes() const override
-    {
-        return {r, g, b, dim, strobo};
-    }
-
-    std::string toString() const
-    {
-        return Fragment::toString() + ": " + name + "(" + std::to_string(r) + ", " + std::to_string(g) + ", " + std::to_string(b) + ", " + std::to_string(dim) + ", " + std::to_string(strobo) + ")";
-    }
-
-    friend std::ostream &operator<<(std::ostream &os, const LedPAR &par)
-    {
-        os << par.toString();
-        return os;
-    }
-};
-
 int main()
 {
 
     FragmentedMemory memory;
-    Col red = {255, 127, 12, "red"};
-    if (!memory.add(red))
+    Light::Group rgb("RGB", {R, G, B});
+    Light light("LedBar", rgb, 20);
+    Light light2("LedBar2", rgb, 30);
+    Light light3("LedBar3", rgb, 40);
+
+    if (!memory.add(light))
     {
         return -1;
     }
 
-    red.g = 33;
-
-    if (!memory.add(red, 5))
+    if (!memory.add(light2))
     {
         return -1;
     }
 
-    LedPAR par = {255, 0, 0, 0, 0};
-
-    if (!memory.add(par, 10))
+    if (!memory.add(light3))
     {
         return -1;
     }
 
-    par.g = 127;
-
-    if (!memory.add(par))
+    for (int i = 0; i < 10; i++)
     {
-        return -1;
+        Light temp("LedBar4", rgb, 1);
+        memory.add(temp);
     }
 
-    par.b = 255;
-    if (!memory.add(par))
+    auto redBlueLambda = [](int groupSize, int index, int offset, std::vector<std::vector<int>> &values)
     {
-        return -1;
-    }
+        auto &v = values[index];
+        v[0] = (int)(std::sin(M_PI * ((index + offset) % groupSize) / groupSize) * 255);
+        v[2] = (int)(std::sin(M_PI * ((index + offset + groupSize / 2) % groupSize) / groupSize) * 255);
+    };
 
-    par.dim = 100;
-    if (!memory.add(par))
+    auto lowerIntesityLambda = [](int groupSize, int index, int offset, std::vector<std::vector<int>> &values)
     {
-        return -1;
+        auto &v = values[index];
+        auto hsv = rgbToHsv(v);
+        hsv[2] *= 0.9;
+        auto rgb = hsvToRgb(hsv);
+        v[0] = rgb[0];
+        v[1] = rgb[1];
+        v[2] = rgb[2];
+    };
+
+    auto coloriseLambda = [](int groupSize, int index, int offset, std::vector<std::vector<int>> &values)
+    {
+        auto &v = values[index];
+        std::cout << colorByRGB(v[0], v[1], v[2], false) << "  " << colorReset;
+    };
+
+    auto hueShiftLambda = [](int groupSize, int index, int offset, std::vector<std::vector<int>> &values)
+    {
+        auto &v = values[index];
+        auto hsv = rgbToHsv(v);
+        hsv[0] = fmod(hsv[0] + 5 * offset, 360.0);
+        auto rgb = hsvToRgb(hsv);
+        v[0] = rgb[0];
+        v[1] = rgb[1];
+        v[2] = rgb[2];
+    };
+
+    light2.applyFunctionToAllGroups("RGB", redBlueLambda, 10);
+
+    for (int i = 0; i < 100; i++)
+    {
+        memory[0].applyFunctionToAllGroups("RGB", redBlueLambda, i);
+        memory[0].applyFunctionToAllGroups("RGB", coloriseLambda);
+
+        light2.applyFunctionToAllGroups("RGB", hueShiftLambda, i);
+        light2.applyFunctionToAllGroups("RGB", coloriseLambda);
+
+        light3.setGroup("RGB", i % 40, hsvToRgb({(float)fmod((float)i * 5, 360.0f), 1.0, 1.0}));
+        light3.applyFunctionToAllGroups("RGB", lowerIntesityLambda);
+        light3.applyFunctionToAllGroups("RGB", coloriseLambda);
+        std::cout.flush();
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        std::cout << "\r";
     }
+    std::cout << std::endl;
+    memory[memory.m_Lights.size() - 1].setGroup("RGB", 0, {255, 0, 0});
 
     memory.printFragments();
     memory.printBytes();
-    // memory.printFragmentsWithId(1);
-
-    // memory[id][fields]
-    /*
-        struct fieldColor {
-            uint8_t r, g, b;
-        }
-     */
-
-    // TODO: how do this
-    // auto pars = memory[1];
-    // for(auto &p: pars) {
-    //     pars[0]->g = 255;
-    // }
-    // memory.add(1, red);
 }
