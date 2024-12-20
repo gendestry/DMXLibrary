@@ -436,7 +436,7 @@ struct Light
             if (i % 16 == 0)
                 std::cout << std::endl;
 
-            std::cout << padByte(m_bytes[i], 3) << " ";
+            std::cout << Utils::padByte(m_bytes[i], 3) << " ";
         }
 
         std::cout << colorReset << std::endl;
@@ -452,11 +452,16 @@ struct Light
     }
 };
 
-struct FragmentedMemory
+struct DMXUniverse
 {
-    std::vector<Light> m_Lights;
+    unsigned int universeID;
+
+    std::vector<Light> lights;
+    std::unordered_map<std::string, std::vector<Light>> ligthsByName;
     uint8_t m_bytes[MAX_SIZE] = {0};
     unsigned int bytesPatched[MAX_SIZE] = {0};
+
+    DMXUniverse(unsigned int universe = 1) : universeID(universe) {}
 
     void fillBytesPatched(int start, int end)
     {
@@ -471,7 +476,7 @@ struct FragmentedMemory
 
     bool add(Light &fragment, int start = -1)
     {
-        if (m_Lights.empty())
+        if (lights.empty())
         {
             int size = fragment.getSize();
             if (size <= MAX_SIZE)
@@ -479,7 +484,8 @@ struct FragmentedMemory
                 unsigned int startOffset = start == -1 ? 0 : start;
                 fragment.start = startOffset;
                 fragment.m_bytes = &m_bytes[startOffset];
-                m_Lights.push_back(fragment);
+                lights.push_back(fragment);
+
                 fillBytesPatched(startOffset, startOffset + size);
                 return true;
             }
@@ -493,14 +499,14 @@ struct FragmentedMemory
         // insert next
         if (start == -1)
         {
-            auto &frag = m_Lights[m_Lights.size() - 1];
+            auto &frag = lights[lights.size() - 1];
 
             // if segment fits at end
             if (frag.start + frag.getSize() + fragment.getSize() <= MAX_SIZE)
             {
                 fragment.start = frag.start + frag.getSize();
                 fragment.m_bytes = &m_bytes[fragment.start];
-                m_Lights.push_back(fragment);
+                lights.push_back(fragment);
                 fillBytesPatched(fragment.start, fragment.start + fragment.getSize());
                 return true;
             }
@@ -508,18 +514,14 @@ struct FragmentedMemory
         else
         {
             unsigned int size = fragment.getSize();
-            for (int i = 0; i < m_Lights.size(); i++)
+            for (int i = 0; i < lights.size(); i++)
             {
-
-                auto &current = m_Lights[i];
-                // std::cout << "Current: " << current << std::endl;
-                // std::cout << "i: " << i << ", Segment size: " << m_Lights.size() << std::endl;
+                auto &current = lights[i];
 
                 // not last segment
-                if (i < m_Lights.size() - 1)
+                if (i < lights.size() - 1)
                 {
-                    // std::cout << "here" << std::endl;
-                    auto &next = m_Lights[i + 1];
+                    auto &next = lights[i + 1];
                     if (start >= current.start && start < current.start + current.getSize())
                     {
                         std::cout << "Segment within bounds" << std::endl;
@@ -535,7 +537,7 @@ struct FragmentedMemory
                     {
                         fragment.start = start;
                         fragment.m_bytes = &m_bytes[fragment.start];
-                        m_Lights.insert(m_Lights.begin() + i + 1, fragment);
+                        lights.insert(lights.begin() + i + 1, fragment);
                         fillBytesPatched(start, start + size);
                         return true;
                     }
@@ -547,8 +549,6 @@ struct FragmentedMemory
                 else
                 {
                     // check if segment within current segment bounds
-                    // std::cout << current->start << ", " << current->size << std::endl;
-                    // std::cout << start << ", " << size << std::endl;
                     if (start >= current.start && start < current.start + current.getSize())
                     {
                         std::cout << "Segment within bounds 1" << std::endl;
@@ -565,8 +565,7 @@ struct FragmentedMemory
                     {
                         fragment.start = start;
                         fragment.m_bytes = &m_bytes[fragment.start];
-                        m_Lights.push_back(fragment);
-                        // ligthsByName[light.getName()].push_back(&segments[segments.size() - 1].light);
+                        lights.push_back(fragment);
                         fillBytesPatched(start, start + size);
                         return true;
                     }
@@ -582,22 +581,24 @@ struct FragmentedMemory
         return false;
     }
 
+    inline const unsigned int numLights() const { return lights.size(); }
+
     Light &operator[](int index)
     {
-        if (index < 0 || index >= m_Lights.size())
+        if (index < 0 || index >= lights.size())
         {
             throw std::runtime_error("Index out of bounds");
         }
-        return m_Lights[index];
+        return lights[index];
     }
 
     std::vector<uint8_t> getBytes() const
     {
         std::vector<uint8_t> bytes(MAX_SIZE, 0);
         int index = 0;
-        for (int i = 0; i < m_Lights.size(); i++)
+        for (int i = 0; i < lights.size(); i++)
         {
-            const auto &curr = m_Lights[i];
+            const auto &curr = lights[i];
             uint8_t *currBytes = curr.getBytes();
 
             for (int j = curr.start; j < curr.start + curr.getSize(); j++)
@@ -612,10 +613,10 @@ struct FragmentedMemory
     void printFragments() const
     {
         // std::cout << "Segments: " << segments.size() << std::endl;
-        for (int i = 0; i < m_Lights.size(); i++)
+        for (int i = 0; i < lights.size(); i++)
         {
             const int offset = 0;
-            auto &curr = m_Lights[i];
+            auto &curr = lights[i];
             int cstart = curr.start;
             int cnext = curr.start + curr.getSize();
             int cend = curr.start + curr.getSize() - 1;
@@ -627,12 +628,13 @@ struct FragmentedMemory
                 //           << " Empty" << std::endl;
             }
 
-            printf("[%3d, %3d] %s\n", cstart + offset, cend + offset, curr.toString().c_str());
+            printf("[%3d, %3d] %s\n", cstart + offset, cend + offset, curr.m_Name.c_str());
+            // printf("[%3d, %3d] %s\n", cstart + offset, cend + offset, curr.toString().c_str());
             // std::cout << "[" << std::setw(3) << (curr.start + offset) << ", " << std::setw(3) << (curr.start + curr.getSize() - 1 + offset) << "] " << curr.toString() << std::endl;
 
-            if (i < m_Lights.size() - 1)
+            if (i < lights.size() - 1)
             {
-                auto &next = m_Lights[i + 1];
+                auto &next = lights[i + 1];
                 if (curr.start + curr.getSize() != next.start)
                 {
                     printf("[%3d, %3d] Empty\n", cnext + offset, next.start - 1 + offset);
@@ -656,13 +658,11 @@ struct FragmentedMemory
 
     void printBytes() const
     {
+        unsigned int prevByteColor = 0;
         std::vector<float> colorVecHsv = {110.0f, 0.7f, 1.0f};
-        const std::string reset = "\x1B[0m";
         std::vector<uint8_t> bytes = getBytes();
 
-        std::cout << "Bytes: \n";
-
-        unsigned int prevByteColor = 0;
+        const std::string reset = "\x1B[0m";
         std::string col = reset;
 
         std::cout << "\x1B[3m";
@@ -693,8 +693,8 @@ struct FragmentedMemory
             {
                 if (prevByteColor != bytesPatched[i])
                 {
-                    auto colorVec = hsvToRgb(colorVecHsv);
-                    col = colorByRGB(colorVec[0], colorVec[1], colorVec[2], true);
+                    auto colorVec = Utils::hsvToRgb(colorVecHsv);
+                    col = Utils::colorByRGB(colorVec[0], colorVec[1], colorVec[2], true);
                     colorVecHsv[0] = fmod(colorVecHsv[0] + 55, 360.0f);
 
                     prevByteColor = bytesPatched[i];
@@ -704,17 +704,28 @@ struct FragmentedMemory
             {
                 col = reset + "\x1B[2m" + "\x1B[3m";
             }
-            std::cout << col << padByte(bytes[i], 3) << reset << "  ";
+            std::cout << col << Utils::padByte(bytes[i], 3) << reset << "  ";
         }
 
         std::cout << std::endl;
     }
+
+    void print() const
+    {
+        std::cout << "Universe: " << universeID << std::endl;
+        std::cout << "Number of Lights: " << lights.size() << std::endl;
+        std::cout << "Patch list: " << std::endl;
+        printFragments();
+
+        std::cout << "Bytes: " << std::endl;
+        printBytes();
+    };
 };
 
 int main()
 {
 
-    FragmentedMemory memory;
+    DMXUniverse memory(1);
     Light::Group rgb("RGB", {R, G, B});
     Light light("LedBar", rgb, 20);
     Light light2("LedBar2", rgb, 30);
@@ -735,11 +746,11 @@ int main()
         return -1;
     }
 
-    for (int i = 0; i < 10; i++)
-    {
-        Light temp("LedBar4", rgb, 1);
-        memory.add(temp);
-    }
+    // for (int i = 0; i < 10; i++)
+    // {
+    //     Light temp("LedBar4", rgb, 1);
+    //     memory.add(temp);
+    // }
 
     auto redBlueLambda = [](int groupSize, int index, int offset, std::vector<std::vector<int>> &values)
     {
@@ -751,9 +762,9 @@ int main()
     auto lowerIntesityLambda = [](int groupSize, int index, int offset, std::vector<std::vector<int>> &values)
     {
         auto &v = values[index];
-        auto hsv = rgbToHsv(v);
+        auto hsv = Utils::rgbToHsv(v);
         hsv[2] *= 0.9;
-        auto rgb = hsvToRgb(hsv);
+        auto rgb = Utils::hsvToRgb(hsv);
         v[0] = rgb[0];
         v[1] = rgb[1];
         v[2] = rgb[2];
@@ -762,15 +773,15 @@ int main()
     auto coloriseLambda = [](int groupSize, int index, int offset, std::vector<std::vector<int>> &values)
     {
         auto &v = values[index];
-        std::cout << colorByRGB(v[0], v[1], v[2], false) << "  " << colorReset;
+        std::cout << Utils::colorByRGB(v[0], v[1], v[2], false) << "  " << colorReset;
     };
 
     auto hueShiftLambda = [](int groupSize, int index, int offset, std::vector<std::vector<int>> &values)
     {
         auto &v = values[index];
-        auto hsv = rgbToHsv(v);
+        auto hsv = Utils::rgbToHsv(v);
         hsv[0] = fmod(hsv[0] + 5 * offset, 360.0);
-        auto rgb = hsvToRgb(hsv);
+        auto rgb = Utils::hsvToRgb(hsv);
         v[0] = rgb[0];
         v[1] = rgb[1];
         v[2] = rgb[2];
@@ -786,7 +797,7 @@ int main()
         light2.applyFunctionToAllGroups("RGB", hueShiftLambda, i);
         light2.applyFunctionToAllGroups("RGB", coloriseLambda);
 
-        light3.setGroup("RGB", i % 40, hsvToRgb({(float)fmod((float)i * 5, 360.0f), 1.0, 1.0}));
+        light3.setGroup("RGB", i % 40, Utils::hsvToRgb({(float)fmod((float)i * 5, 360.0f), 1.0, 1.0}));
         light3.applyFunctionToAllGroups("RGB", lowerIntesityLambda);
         light3.applyFunctionToAllGroups("RGB", coloriseLambda);
         std::cout.flush();
@@ -794,8 +805,7 @@ int main()
         std::cout << "\r";
     }
     std::cout << std::endl;
-    memory[memory.m_Lights.size() - 1].setGroup("RGB", 0, {255, 0, 0});
+    // memory[memory.numLights() - 1].setGroup("RGB", 0, {255, 0, 0});
 
-    memory.printFragments();
-    memory.printBytes();
+    memory.print();
 }
