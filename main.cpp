@@ -41,6 +41,13 @@ enum LightPatchUnit
                                                   : x == Strobo16 ? "Strobo16" \
                                                                   : "Unknown")
 
+struct EffectParams {
+    int globalSize = -1, offsetGlobal = 0, localSize = -1, localId = -1, tick;
+    void* other;
+    EffectParams(int tick = 0, void* other = nullptr): tick(tick), other(other) {}
+};
+typedef void (*EffectFn)(EffectParams &params, std::vector<std::vector<int>> &values);
+
 struct Light
 {
     struct Group
@@ -357,7 +364,25 @@ struct Light
     }
 
     // apply a lambda function to a group at index
-    bool applyFunctionToGroup(std::string name, unsigned int index, void (*func)(int, int, int, std::vector<std::vector<int>> &), int offset = 0)
+    bool applyFunctionToGroup(std::string name, int index, EffectParams params, EffectFn func)
+    {
+        if (m_groupMap.find(name) == m_groupMap.end())
+        {
+            throw std::runtime_error("Group not found");
+            return false;
+        }
+
+        params.localId = index;
+        auto values = getGroups(name);
+        auto &setVals = values[params.localId];
+        params.localSize = m_groupMap[name].size();
+        if (params.globalSize < 0) params.globalSize = params.localSize;
+        func(params, values);
+        return setGroup(name, params.localId, setVals);
+    }
+
+    // apply a lambda function to a group at indexes
+    bool applyFunctionToGroup(std::string name, std::vector<unsigned int> indexes, EffectParams params, EffectFn func)
     {
         if (m_groupMap.find(name) == m_groupMap.end())
         {
@@ -366,23 +391,14 @@ struct Light
         }
 
         auto values = getGroups(name);
-        auto &setVals = values[index];
-        func(m_groupMap[name].size(), index, offset, values);
-        return setGroup(name, index, setVals);
-    }
-
-    // apply a lambda function to a group at indexes
-    bool applyFunctionToGroup(std::string name, std::vector<unsigned int> indexes, void (*func)(int, int, int, std::vector<std::vector<int>> &), int offset = 0)
-    {
-        if (m_groupMap.find(name) == m_groupMap.end())
-        {
-            throw std::runtime_error("Group not found");
-            return false;
-        }
-
+        params.localSize = m_groupMap[name].size();
+        if (params.globalSize < 0) params.globalSize = params.localSize;
         for (auto index : indexes)
         {
-            if (!applyFunctionToGroup(name, index, func, offset))
+            params.localId = index;
+            auto &setVals = values[params.localId];
+            func(params, values);
+            if(!setGroup(name, params.localId, setVals))
                 return false;
         }
 
@@ -390,7 +406,7 @@ struct Light
     }
 
     // apply a lambda function to all groups
-    bool applyFunctionToAllGroups(std::string name, void (*func)(int, int, int, std::vector<std::vector<int>> &), int offset = 0)
+    bool applyFunctionToAllGroups(std::string name, EffectParams params, EffectFn func)
     {
         if (m_groupMap.find(name) == m_groupMap.end())
         {
@@ -398,9 +414,15 @@ struct Light
             return false;
         }
 
+        auto values = getGroups(name);
+        params.localSize = m_groupMap[name].size();
+        if (params.globalSize < 0) params.globalSize = params.localSize;
         for (int i = 0; i < m_groupMap[name].size(); i++)
         {
-            if (!applyFunctionToGroup(name, i, func, offset))
+            params.localId = i;
+            auto &setVals = values[params.localId];
+            func(params, values);
+            if(!setGroup(name, params.localId, setVals))
                 return false;
         }
 
@@ -451,6 +473,23 @@ struct Light
         printBytesPatched();
     }
 };
+
+bool applyFunctionToLights(std::vector<Light> lights, std::string group, EffectParams params, EffectFn fun)
+{
+    params.globalSize = 0;
+    params.offsetGlobal = 0;
+    for (auto& light : lights)
+    {
+        params.globalSize += light[group].size();
+    }
+    for (auto& light : lights)
+    {
+        if(!light.applyFunctionToAllGroups(group, params, fun))
+            return false;
+        params.offsetGlobal += light[group].size();
+    }
+    return true;
+}
 
 struct DMXUniverse
 {
@@ -726,6 +765,7 @@ int main()
 {
 
     DMXUniverse memory(1);
+    DMXUniverse memory2(2);
     Light::Group rgb("RGB", {R, G, B});
     Light light("LedBar", rgb, 20);
     Light light2("LedBar2", rgb, 30);
@@ -741,7 +781,7 @@ int main()
         return -1;
     }
 
-    if (!memory.add(light3))
+    if (!memory2.add(light3))
     {
         return -1;
     }
@@ -752,16 +792,16 @@ int main()
     //     memory.add(temp);
     // }
 
-    auto redBlueLambda = [](int groupSize, int index, int offset, std::vector<std::vector<int>> &values)
+    EffectFn redBlueLambda = [](EffectParams &params, std::vector<std::vector<int>> &values)
     {
-        auto &v = values[index];
-        v[0] = (int)(std::sin(M_PI * ((index + offset) % groupSize) / groupSize) * 255);
-        v[2] = (int)(std::sin(M_PI * ((index + offset + groupSize / 2) % groupSize) / groupSize) * 255);
+        auto &v = values[params.localId];
+        v[0] = (int)(std::sin(M_PI * ((params.localId + params.tick) % params.localSize) / params.localSize) * 255);
+        v[2] = (int)(std::sin(M_PI * ((params.localId + params.tick + params.localSize / 2) % params.localSize) / params.localSize) * 255);
     };
 
-    auto lowerIntesityLambda = [](int groupSize, int index, int offset, std::vector<std::vector<int>> &values)
+    EffectFn lowerIntesityLambda = [](EffectParams &params, std::vector<std::vector<int>> &values)
     {
-        auto &v = values[index];
+        auto &v = values[params.localId];
         auto hsv = Utils::rgbToHsv(v);
         hsv[2] *= 0.9;
         auto rgb = Utils::hsvToRgb(hsv);
@@ -770,36 +810,60 @@ int main()
         v[2] = rgb[2];
     };
 
-    auto coloriseLambda = [](int groupSize, int index, int offset, std::vector<std::vector<int>> &values)
+    EffectFn coloriseLambda = [](EffectParams &params, std::vector<std::vector<int>> &values)
     {
-        auto &v = values[index];
+        auto &v = values[params.localId];
         std::cout << Utils::colorByRGB(v[0], v[1], v[2], false) << "  " << colorReset;
     };
 
-    auto hueShiftLambda = [](int groupSize, int index, int offset, std::vector<std::vector<int>> &values)
+    EffectFn hueShiftLambda = [](EffectParams &params, std::vector<std::vector<int>> &values)
     {
-        auto &v = values[index];
+        auto &v = values[params.localId];
         auto hsv = Utils::rgbToHsv(v);
-        hsv[0] = fmod(hsv[0] + 5 * offset, 360.0);
+        hsv[0] = fmod(hsv[0] + 5 * params.tick, 360.0);
         auto rgb = Utils::hsvToRgb(hsv);
         v[0] = rgb[0];
         v[1] = rgb[1];
         v[2] = rgb[2];
     };
 
-    light2.applyFunctionToAllGroups("RGB", redBlueLambda, 10);
+    EffectFn globalSnake = [](EffectParams &params, std::vector<std::vector<int>> &values)
+    {
+        auto &v = values[params.localId];
+        float globalId = (float)params.offsetGlobal+params.localId;
+        if(params.tick % params.globalSize == globalId)
+        {
+            auto rgb = Utils::hsvToRgb({(globalId/params.globalSize*359.0f), 1.0, 1.0});
+            v[0] = rgb[0];
+            v[1] = rgb[1];
+            v[2] = rgb[2];
+        }
+        else
+        {
+            auto hsv = Utils::rgbToHsv(v);
+            hsv[2] *= 0.9;
+            auto rgb = Utils::hsvToRgb(hsv);
+            v[0] = rgb[0];
+            v[1] = rgb[1];
+            v[2] = rgb[2];
+        }
+    };
 
+    EffectParams params(10);
+    light2.applyFunctionToAllGroups("RGB", params, redBlueLambda);
     for (int i = 0; i < 100; i++)
     {
-        memory[0].applyFunctionToAllGroups("RGB", redBlueLambda, i);
-        memory[0].applyFunctionToAllGroups("RGB", coloriseLambda);
+        params.tick = i;
+        applyFunctionToLights({memory[0], memory[1], memory2[0]}, "RGB", params, globalSnake);
+        // memory[0].applyFunctionToAllGroups("RGB", params, redBlueLambda);
+        memory[0].applyFunctionToAllGroups("RGB", params, coloriseLambda);
 
-        light2.applyFunctionToAllGroups("RGB", hueShiftLambda, i);
-        light2.applyFunctionToAllGroups("RGB", coloriseLambda);
+        // light2.applyFunctionToAllGroups("RGB", params, hueShiftLambda);
+        light2.applyFunctionToAllGroups("RGB", params, coloriseLambda);
 
-        light3.setGroup("RGB", i % 40, Utils::hsvToRgb({(float)fmod((float)i * 5, 360.0f), 1.0, 1.0}));
-        light3.applyFunctionToAllGroups("RGB", lowerIntesityLambda);
-        light3.applyFunctionToAllGroups("RGB", coloriseLambda);
+        // light3.setGroup("RGB", i % 40, Utils::hsvToRgb({(float)fmod((float)i * 5, 360.0f), 1.0, 1.0}));
+        // light3.applyFunctionToAllGroups("RGB", params, lowerIntesityLambda);
+        light3.applyFunctionToAllGroups("RGB", params, coloriseLambda);
         std::cout.flush();
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
         std::cout << "\r";
