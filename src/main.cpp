@@ -39,26 +39,29 @@ int main()
     };
 
     EffectParams params;
-    applyFunctionToLights({u1[0], u1[1], u1[2], u1[3]}, "RGB", params, globalRedBlueLambda);
-    applyFunctionToLights({u1[0], u1[1], u1[2], u1[3]}, "RGB", params, coloriseLambda);
-
-    u1.print();
-    std::cout << std::endl;
+    u1[0]["RGB"][0].setValues({255, 0, 0});
+    u1[1]["RGB"][0].setValues({255, 0, 0});
+    u1[2]["RGB"][0].setValues({255, 255, 255});
+    u2[0].set(B, 255);
+    applyFunctionToLights({u1[0], u1[1], u1[2], u2[0]}, "RGB", params, coloriseLambda);
+    std::cout.flush();
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    std::cout << "\r";
 
     // tole pa segfaulta
     for (int i = 0; i < 100; i++)
     {
         params.tick = i;
-        applyFunctionToLights({u1[0], u1[1], u1[2], u1[3]}, "RGB", params, globalRedBlueLambda);
-        applyFunctionToLights({u1[0], u1[1], u1[2], u1[3]}, "RGB", params, coloriseLambda);
-        std::cout << "  ";
-        applyFunctionToLights({u2[0], u2[1]}, "RGB", params, globalRedBlueLambda);
-        applyFunctionToLights({u2[0], u2[1]}, "RGB", params, coloriseLambda);
+        applyFunctionToLights({u1[0], u1[1], u2[0]}, "RGB", params, globalRedBlueLambda);
+        applyFunctionToLights({u1[0], u1[1], u1[2], u2[0]}, "RGB", params, coloriseLambda);
 
         std::cout.flush();
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
         std::cout << "\r";
     }
+
+    u1.print();
+    u2.print();
 
     // applyFunctionToLights({u1[0], u1[1], u1[2], u1[3]}, "RGB", EffectParams(), globalRedBlueLambda);
     // applyFunctionToLights({u1[0], u1[1], u1[2], u1[3]}, "RGB", EffectParams(), coloriseLambda);

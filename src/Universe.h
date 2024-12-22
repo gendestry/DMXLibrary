@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <functional>
 
 #include "Light.h"
 
@@ -10,7 +11,7 @@
 namespace DMX
 {
 
-    bool applyFunctionToLights(std::vector<Light> lights, std::string group, EffectParams params, EffectFn fun);
+    bool applyFunctionToLights(std::vector<std::reference_wrapper<Light>> lights, std::string group, EffectParams params, EffectFn fun);
 
     class Universe
     {

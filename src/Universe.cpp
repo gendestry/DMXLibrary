@@ -7,20 +7,20 @@
 namespace DMX
 {
 
-    bool applyFunctionToLights(std::vector<Light> lights, std::string group, EffectParams params, EffectFn fun)
+    bool applyFunctionToLights(std::vector<std::reference_wrapper<Light>> lights, std::string group, EffectParams params, EffectFn fun)
     {
         params.globalSize = 0;
         params.offsetGlobal = 0;
         for (auto &light : lights)
         {
-            params.globalSize += light[group].size();
+            params.globalSize += light.get()[group].size();
         }
 
         for (auto &light : lights)
         {
-            if (!light.applyFunctionToAllGroups(group, params, fun))
+            if (!light.get().applyFunctionToAllGroups(group, params, fun))
                 return false;
-            params.offsetGlobal += light[group].size();
+            params.offsetGlobal += light.get()[group].size();
         }
         return true;
     }
