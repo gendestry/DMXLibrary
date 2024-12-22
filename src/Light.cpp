@@ -193,6 +193,7 @@ namespace DMX
         return true;
     }
 
+    // used to refresh groups' memory pointers
     void Light::refreshGroups()
     {
         for (auto &[name, groups] : m_groupMap)
@@ -361,7 +362,8 @@ namespace DMX
         return true;
     }
 
-    std::string Light::toString() const
+    // // PRINTING FUNCTIONS
+    std::string Light::toString() const noexcept
     {
         std::stringstream ss;
         ss << colorItalic << m_Name << colorReset << std::endl;
@@ -373,8 +375,7 @@ namespace DMX
         return ss.str();
     }
 
-    // // PRINTING FUNCTIONS
-    void Light::printGroups() const
+    void Light::printGroups() const noexcept
     {
         for (const auto &[groupName, groups] : m_groupMap)
         {
@@ -382,7 +383,7 @@ namespace DMX
         }
     }
 
-    void Light::printBytesPatched() const
+    void Light::printBytesPatched() const noexcept
     {
         std::cout << colorDim;
         for (int i = 0; i < m_size; i++)
@@ -396,10 +397,9 @@ namespace DMX
         std::cout << colorReset << std::endl;
     }
 
-    void Light::print() const
+    void Light::print() const noexcept
     {
         std::cout << colorItalic << "[" << m_Name << "]" << colorReset << std::endl;
-        // printf("%p\n", m_bytes);
         std::cout << "Groups:\n";
         printGroups();
         std::cout << "Bytes:";

@@ -28,18 +28,7 @@ namespace DMX
     std::string Universe::nextColor(int index) const
     {
         std::vector<float> colorVecHsv = {110.0f, 0.5f, 0.8f};
-        unsigned int prevByteColor = 0;
-        for (int i = 0; i < index; i++)
-        {
-            if (bytesPatched[i] == 0)
-                continue;
-
-            if (prevByteColor != bytesPatched[i])
-            {
-                colorVecHsv[0] = fmod(colorVecHsv[0] + 65, 360.0f);
-                prevByteColor = bytesPatched[i];
-            }
-        }
+        colorVecHsv[0] = fmod(colorVecHsv[0] + (bytesPatched[index] * 65), 360.0f);
         auto colorVec = Utils::hsvToRgb(colorVecHsv);
         return Utils::colorByRGB(colorVec[0], colorVec[1], colorVec[2], true);
     }
@@ -240,52 +229,43 @@ namespace DMX
 
         std::string col = nextColor(0);
 
-        std::cout << colorItalic;
-
         int cond = std::min((int)bytes.size(), 16);
+        auto printSeperator = [&]()
+        {
+            for (int i = 0; i < cond; i++)
+            {
+                std::cout << "----";
+                if (i < cond - 1)
+                    std::cout << "-";
+            }
+            std::cout << std::endl;
+        };
+
+        std::cout << colorItalic;
         for (int i = 0; i < cond; i++)
         {
             static const std::string hex = "0123456789ABCDEF";
             std::cout << "0x" << hex[i] << "  ";
         }
+        std::cout << colorReset << std::endl;
 
-        std::cout << std::dec << colorReset << std::endl;
-
-        // print seperator
-        for (int i = 0; i < cond; i++)
-        {
-            std::cout << "----";
-            if (i < cond - 1)
-                std::cout << "-";
-        }
+        printSeperator();
 
         for (int i = 0; i < bytes.size(); i++)
         {
-            if (i % 16 == 0)
+            if (i % 16 == 0 && i != 0)
                 std::cout << std::endl;
 
             if (bytesPatched[i] != 0)
-            {
-                if (prevByteColor != bytesPatched[i])
-                {
-                    col = nextColor(i);
-                    prevByteColor = bytesPatched[i];
-                }
-            }
+                col = nextColor(i);
             else
-            {
                 col = colorReset + "\x1B[2m" + "\x1B[3m";
-            }
-
-            // if (bytesPatched[i] == 0)
-            //     col = colorReset + "\x1B[2m" + "\x1B[3m";
-            // else
-            //     col = nextColor(i);
 
             std::cout << col << Utils::padByte(bytes[i], 3) << colorReset << "  ";
         }
-
         std::cout << std::endl;
+
+        printSeperator();
     }
 
     void Universe::print() const

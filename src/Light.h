@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <string.h>
 
 const std::string colorGreen = "\x1B[32m";
 const std::string colorYellow = "\x1B[33m";
@@ -114,8 +115,12 @@ namespace DMX
         // copy constructor so groups get refreshed
         Light(const Light &other);
 
+        // functions for getting raw bytes and size
         inline const unsigned int getSize() const { return m_size; }
         inline uint8_t *getBytes() const { return m_bytes; }
+
+        // sets all bytes to 0
+        inline void clearBytes() { memset(m_bytes, 0, m_size); }
 
         // sets all unit patches of the light to a value
         void set(LightPatchUnit unit, int value);
@@ -154,10 +159,10 @@ namespace DMX
         bool applyFunctionToAllGroups(std::string name, EffectParams params, EffectFn func);
 
         // // PRINTING FUNCTIONS
-        std::string toString() const;
-        void printGroups() const;
-        void printBytesPatched() const;
-        void print() const;
+        std::string toString() const noexcept;
+        void printGroups() const noexcept;
+        void printBytesPatched() const noexcept;
+        void print() const noexcept;
     };
 
 };
