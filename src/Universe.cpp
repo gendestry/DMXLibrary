@@ -6,6 +6,7 @@
 
 namespace DMX
 {
+
     bool applyFunctionToLights(std::vector<Light> lights, std::string group, EffectParams params, EffectFn fun)
     {
         params.globalSize = 0;
@@ -14,6 +15,7 @@ namespace DMX
         {
             params.globalSize += light[group].size();
         }
+
         for (auto &light : lights)
         {
             if (!light.applyFunctionToAllGroups(group, params, fun))
@@ -21,6 +23,25 @@ namespace DMX
             params.offsetGlobal += light[group].size();
         }
         return true;
+    }
+
+    std::string Universe::nextColor(int index) const
+    {
+        std::vector<float> colorVecHsv = {110.0f, 0.5f, 0.8f};
+        unsigned int prevByteColor = 0;
+        for (int i = 0; i < index; i++)
+        {
+            if (bytesPatched[i] == 0)
+                continue;
+
+            if (prevByteColor != bytesPatched[i])
+            {
+                colorVecHsv[0] = fmod(colorVecHsv[0] + 65, 360.0f);
+                prevByteColor = bytesPatched[i];
+            }
+        }
+        auto colorVec = Utils::hsvToRgb(colorVecHsv);
+        return Utils::colorByRGB(colorVec[0], colorVec[1], colorVec[2], true);
     }
 
     void Universe::fillBytesPatched(int start, int end)
@@ -44,7 +65,7 @@ namespace DMX
                 unsigned int startOffset = start == -1 ? 0 : start;
                 fragment.start = startOffset;
                 fragment.m_bytes = &m_bytes[startOffset];
-                lights.push_back(fragment);
+                lights.emplace_back(fragment);
 
                 fillBytesPatched(startOffset, startOffset + size);
                 return true;
@@ -171,6 +192,9 @@ namespace DMX
     void Universe::printFragments() const
     {
         // std::cout << "Segments: " << segments.size() << std::endl;
+        constexpr unsigned int printableOffset = 1;
+        std::string col;
+
         for (int i = 0; i < lights.size(); i++)
         {
             const int offset = 0;
@@ -181,17 +205,19 @@ namespace DMX
 
             if (cstart != 0 && i == 0)
             {
-                printf("[%3d, %3d] Empty\n", 0 + offset, cstart - 1 + offset);
+                printf("\x1B[2m[%3d, %3d]\x1B[3m%s Unpatched %s\n", 0 + offset + printableOffset, cstart - 1 + offset + printableOffset, colorItalic.c_str(), colorReset.c_str());
             }
 
-            printf("[%3d, %3d] %s\n", cstart + offset, cend + offset, curr.m_Name.c_str());
+            col = nextColor(cstart);
+
+            printf("%s[%3d, %3d] %s%s (%d) %s\n", col.c_str(), cstart + offset + printableOffset, cend + offset + printableOffset, colorItalic.c_str(), curr.m_Name.c_str(), curr.getSize(), colorReset.c_str());
 
             if (i < lights.size() - 1)
             {
                 auto &next = lights[i + 1];
                 if (curr.start + curr.getSize() != next.start)
                 {
-                    printf("[%3d, %3d] Empty\n", cnext + offset, next.start - 1 + offset);
+                    printf("\x1B[2m[%3d, %3d]\x1B[3m%s Unpatched %s\n", cnext + offset + printableOffset, next.start - 1 + offset + printableOffset, colorItalic.c_str(), colorReset.c_str());
                     continue;
                 }
             }
@@ -199,7 +225,7 @@ namespace DMX
             {
                 if (curr.start + curr.getSize() < MAX_SIZE)
                 {
-                    printf("[%3d, %3d] Empty\n", cnext + offset, MAX_SIZE - 1 + offset);
+                    printf("\x1B[2m[%3d, %3d]\x1B[3m%s Unpatched %s\n", cnext + offset + printableOffset, MAX_SIZE - 1 + offset + printableOffset, colorItalic.c_str(), colorReset.c_str());
                     continue;
                 }
             }
@@ -209,13 +235,12 @@ namespace DMX
     void Universe::printBytes() const
     {
         unsigned int prevByteColor = 0;
-        std::vector<float> colorVecHsv = {110.0f, 0.7f, 1.0f};
+        std::vector<float> colorVecHsv = {110.0f, 0.5f, 0.8f};
         std::vector<uint8_t> bytes = getBytes();
 
-        const std::string reset = "\x1B[0m";
-        std::string col = reset;
+        std::string col = nextColor(0);
 
-        std::cout << "\x1B[3m";
+        std::cout << colorItalic;
 
         int cond = std::min((int)bytes.size(), 16);
         for (int i = 0; i < cond; i++)
@@ -224,7 +249,7 @@ namespace DMX
             std::cout << "0x" << hex[i] << "  ";
         }
 
-        std::cout << std::dec << reset << std::endl;
+        std::cout << std::dec << colorReset << std::endl;
 
         // print seperator
         for (int i = 0; i < cond; i++)
@@ -243,18 +268,21 @@ namespace DMX
             {
                 if (prevByteColor != bytesPatched[i])
                 {
-                    auto colorVec = Utils::hsvToRgb(colorVecHsv);
-                    col = Utils::colorByRGB(colorVec[0], colorVec[1], colorVec[2], true);
-                    colorVecHsv[0] = fmod(colorVecHsv[0] + 55, 360.0f);
-
+                    col = nextColor(i);
                     prevByteColor = bytesPatched[i];
                 }
             }
             else
             {
-                col = reset + "\x1B[2m" + "\x1B[3m";
+                col = colorReset + "\x1B[2m" + "\x1B[3m";
             }
-            std::cout << col << Utils::padByte(bytes[i], 3) << reset << "  ";
+
+            // if (bytesPatched[i] == 0)
+            //     col = colorReset + "\x1B[2m" + "\x1B[3m";
+            // else
+            //     col = nextColor(i);
+
+            std::cout << col << Utils::padByte(bytes[i], 3) << colorReset << "  ";
         }
 
         std::cout << std::endl;
@@ -262,8 +290,7 @@ namespace DMX
 
     void Universe::print() const
     {
-        std::cout << "Universe: " << universeID << std::endl;
-        std::cout << "Number of Lights: " << lights.size() << std::endl;
+        std::cout << "Universe: " << universeID << ", Number of Lights: " << lights.size() << std::endl;
         std::cout << "Patch list: " << std::endl;
         printFragments();
 

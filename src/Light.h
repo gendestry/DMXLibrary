@@ -111,6 +111,9 @@ namespace DMX
         // create a light with name using a group and amount of said groups
         Light(std::string name, Group group, unsigned int numGroups);
 
+        // copy constructor so groups get refreshed
+        Light(const Light &other);
+
         inline const unsigned int getSize() const { return m_size; }
         inline uint8_t *getBytes() const { return m_bytes; }
 
@@ -119,6 +122,9 @@ namespace DMX
 
         // adds a custom indexing group
         bool addGroup(Group group);
+
+        // used to refresh groups' memory pointers
+        void refreshGroups();
 
         // sets group values at index
         bool setGroup(std::string name, unsigned int index, std::vector<int> values);

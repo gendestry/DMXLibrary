@@ -64,6 +64,7 @@ namespace DMX
     std::string Light::Group::describe() const
     {
         std::stringstream ss;
+        // printf("Ptr: %p\n", memory);
         ss << "\x1B[34m\"" << name << "\"\x1B[0m size: " << size << " {";
         for (int i = 0; i < units.size(); i++)
         {
@@ -129,6 +130,19 @@ namespace DMX
         addGroup(group);
     }
 
+    // copy constructor
+    Light::Light(const Light &other)
+        : m_Name(other.m_Name),
+          start(other.start),
+          m_size(other.m_size),
+          m_patchID(other.m_patchID),
+          m_patchMap(other.m_patchMap),
+          m_groupMap(other.m_groupMap),
+          m_bytes(other.m_bytes)
+    {
+        refreshGroups();
+    }
+
     // sets all unit patches of the light to a value
     void Light::set(LightPatchUnit unit, int value)
     {
@@ -177,6 +191,17 @@ namespace DMX
         }
 
         return true;
+    }
+
+    void Light::refreshGroups()
+    {
+        for (auto &[name, groups] : m_groupMap)
+        {
+            auto group = groups[0];
+            groups.clear();
+            m_groupMap.erase(name);
+            addGroup(group);
+        }
     }
 
     // sets group values at index
@@ -374,6 +399,7 @@ namespace DMX
     void Light::print() const
     {
         std::cout << colorItalic << "[" << m_Name << "]" << colorReset << std::endl;
+        // printf("%p\n", m_bytes);
         std::cout << "Groups:\n";
         printGroups();
         std::cout << "Bytes:";
