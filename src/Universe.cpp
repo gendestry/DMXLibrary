@@ -7,21 +7,62 @@
 namespace DMX
 {
 
-    bool applyFunctionToLights(std::vector<std::reference_wrapper<Light>> lights, std::string group, EffectParams params, EffectFn fun)
+    bool applyFunctionToLights(std::vector<std::reference_wrapper<Light>> lights, std::string groupName, EffectParams params, EffectFn fun)
     {
         params.globalSize = 0;
         params.offsetGlobal = 0;
         for (auto &light : lights)
         {
-            params.globalSize += light.get()[group].size();
+            params.globalSize += light.get()[groupName].size();
         }
 
         for (auto &light : lights)
         {
-            if (!light.get().applyFunctionToAllGroups(group, params, fun))
+            if (!light.get().applyFunctionToAllGroups(groupName, params, fun))
                 return false;
-            params.offsetGlobal += light.get()[group].size();
+            params.offsetGlobal += light.get()[groupName].size();
         }
+        return true;
+    }
+
+    bool applyFunctionToLights(std::vector<Light *> lights, std::string groupName, EffectParams params, EffectFn fun)
+    {
+        params.globalSize = 0;
+        params.offsetGlobal = 0;
+
+        for (Light *light : lights)
+        {
+            params.globalSize += (*light)[groupName].size();
+        }
+
+        for (Light *light : lights)
+        {
+            if (!(*light).applyFunctionToAllGroups(groupName, params, fun))
+                return false;
+            params.offsetGlobal += (*light)[groupName].size();
+        }
+
+        return true;
+    }
+
+    bool applyFunctionToLights(LightGroup &group, std::string groupName, EffectParams params, EffectFn fun)
+    {
+        params.globalSize = 0;
+        params.offsetGlobal = 0;
+        auto lights = group();
+
+        for (Light *light : lights)
+        {
+            params.globalSize += (*light)[groupName].size();
+        }
+
+        for (Light *light : lights)
+        {
+            if (!(*light).applyFunctionToAllGroups(groupName, params, fun))
+                return false;
+            params.offsetGlobal += (*light)[groupName].size();
+        }
+
         return true;
     }
 
@@ -46,6 +87,8 @@ namespace DMX
 
     bool Universe::add(Light &fragment, int start)
     {
+        static int neki = 1;
+        // std::cout << neki++ << ":" << std::endl;
         if (lights.empty())
         {
             int size = fragment.getSize();
@@ -54,8 +97,9 @@ namespace DMX
                 unsigned int startOffset = start == -1 ? 0 : start;
                 fragment.start = startOffset;
                 fragment.m_bytes = &m_bytes[startOffset];
-                lights.emplace_back(fragment);
+                fragment.m_ID = Light::incrementID(fragment.m_Name);
 
+                lights.push_back(fragment);
                 fillBytesPatched(startOffset, startOffset + size);
                 return true;
             }
@@ -74,8 +118,22 @@ namespace DMX
             // if segment fits at end
             if (frag.start + frag.getSize() + fragment.getSize() <= MAX_SIZE)
             {
+                // std::cout << "Segment fits at end" << std::endl;
                 fragment.start = frag.start + frag.getSize();
                 fragment.m_bytes = &m_bytes[fragment.start];
+                fragment.m_ID = Light::incrementID(fragment.m_Name);
+                // printf("Start: %d, End: %d\n", fragment.start, fragment.start + fragment.getSize());
+                // printf("Ptr: %p\n", fragment.m_bytes);
+                // printf("Ptr")
+                // std::cout << lights.size() << std::endl;
+                // try
+                // {
+                //     lights.push_back(fragment);
+                // }
+                // catch (std::exception &e)
+                // {
+                //     std::cout << e.what() << std::endl;
+                // }
                 lights.push_back(fragment);
                 fillBytesPatched(fragment.start, fragment.start + fragment.getSize());
                 return true;
@@ -107,6 +165,8 @@ namespace DMX
                     {
                         fragment.start = start;
                         fragment.m_bytes = &m_bytes[fragment.start];
+                        fragment.m_ID = Light::incrementID(fragment.m_Name);
+
                         lights.insert(lights.begin() + i + 1, fragment);
                         fillBytesPatched(start, start + size);
                         return true;
@@ -135,6 +195,8 @@ namespace DMX
                     {
                         fragment.start = start;
                         fragment.m_bytes = &m_bytes[fragment.start];
+                        fragment.m_ID = Light::incrementID(fragment.m_Name);
+
                         lights.push_back(fragment);
                         fillBytesPatched(start, start + size);
                         return true;
@@ -149,6 +211,19 @@ namespace DMX
         }
 
         return false;
+    }
+
+    std::vector<Light *> Universe::getLights(std::string name)
+    {
+        std::vector<Light *> result;
+        for (Light &light : lights)
+        {
+            if (light.m_Name == name)
+            {
+                result.push_back(&light);
+            }
+        }
+        return result;
     }
 
     Light &Universe::operator[](int index)

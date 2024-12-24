@@ -5,6 +5,7 @@
 
 namespace DMX
 {
+    std::unordered_map<std::string, unsigned int> Light::m_currentIndex;
 
     Light::Group::Group(std::string name, std::vector<LightPatchUnit> units) : name(name), units(units)
     {
@@ -92,7 +93,7 @@ namespace DMX
     }
 
     /* ===== LIGHT CLASS ===== */
-    Light::Light(std::string name, std::vector<LightPatchUnit> patchUnits) : m_Name(name), m_patchID(patchUnits)
+    Light::Light(std::string name, std::vector<LightPatchUnit> patchUnits, bool inverted, bool standalone) : m_Name(name), m_patchID(patchUnits), m_inverted(inverted), m_standalone(standalone)
     {
         unsigned int counter = 0;
         for (unsigned int i = 0; i < patchUnits.size(); i++)
@@ -105,11 +106,18 @@ namespace DMX
         }
 
         m_size = counter;
+
+        if (standalone)
+            m_bytes = new uint8_t[m_size];
     }
 
-    Light::Light(std::string name, Group group, unsigned int numGroups) : m_Name(name)
+    Light::Light(std::string name, Group group, unsigned int numGroups, bool inverted, bool standalone) : m_Name(name), m_inverted(inverted), m_standalone(standalone)
     {
         m_size = group.getGroupFootprint() * numGroups;
+
+        if (standalone)
+            m_bytes = new uint8_t[m_size];
+
         for (int i = 0; i < numGroups; i++)
         {
             m_patchID.insert(m_patchID.end(), group.units.begin(), group.units.end());
@@ -130,6 +138,12 @@ namespace DMX
         addGroup(group);
     }
 
+    Light::~Light()
+    {
+        if (m_standalone)
+            delete[] m_bytes;
+    }
+
     // copy constructor
     Light::Light(const Light &other)
         : m_Name(other.m_Name),
@@ -138,9 +152,19 @@ namespace DMX
           m_patchID(other.m_patchID),
           m_patchMap(other.m_patchMap),
           m_groupMap(other.m_groupMap),
-          m_bytes(other.m_bytes)
+          m_bytes(other.m_bytes),
+          m_ID(other.m_ID)
     {
         refreshGroups();
+    }
+
+    unsigned int Light::incrementID(std::string name)
+    {
+        if (m_currentIndex.find(name) == m_currentIndex.end())
+        {
+            m_currentIndex[name] = 0;
+        }
+        return ++m_currentIndex[name];
     }
 
     // sets all unit patches of the light to a value
@@ -399,7 +423,7 @@ namespace DMX
 
     void Light::print() const noexcept
     {
-        std::cout << colorItalic << "[" << m_Name << "]" << colorReset << std::endl;
+        std::cout << colorGreen << m_Name << " [" << m_ID << "]" << colorReset << std::endl;
         std::cout << "Groups:\n";
         printGroups();
         std::cout << "Bytes:";

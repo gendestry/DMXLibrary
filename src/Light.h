@@ -89,9 +89,14 @@ namespace DMX
 
         // the name of the light
         std::string m_Name;
+        unsigned int m_ID;
+        static std::unordered_map<std::string, unsigned int> m_currentIndex;
+
+        bool m_inverted = false;
+        bool m_standalone = false;
 
         // the byte values of the light
-        uint8_t *m_bytes;
+        uint8_t *m_bytes = nullptr;
         unsigned int m_size;
 
         // fragment position
@@ -107,13 +112,17 @@ namespace DMX
         std::unordered_map<std::string, std::vector<Group>> m_groupMap;
 
         // create a light with name using a sequence of patch units
-        Light(std::string name, std::vector<LightPatchUnit> patchUnits);
+        Light(std::string name, std::vector<LightPatchUnit> patchUnits, bool inverted = false, bool standalone = false);
 
         // create a light with name using a group and amount of said groups
-        Light(std::string name, Group group, unsigned int numGroups);
+        Light(std::string name, Group group, unsigned int numGroups, bool inverted = false, bool standalone = false);
+
+        ~Light();
 
         // copy constructor so groups get refreshed
         Light(const Light &other);
+
+        static unsigned int incrementID(std::string name);
 
         // functions for getting raw bytes and size
         inline const unsigned int getSize() const { return m_size; }
