@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include <vector>
+#include <list>
 #include <unordered_map>
 #include <functional>
 #include "LightGroup.h"
@@ -20,7 +21,9 @@ namespace DMX
     {
         unsigned int universeID;
 
-        std::vector<Light> lights;
+        // std::vector<Light> lights;
+        std::list<Light> lights;
+
         std::unordered_map<std::string, std::vector<std::reference_wrapper<Light>>> ligthsByName;
         uint8_t m_bytes[MAX_SIZE] = {0};
         unsigned int bytesPatched[MAX_SIZE] = {0};
@@ -28,13 +31,27 @@ namespace DMX
         std::string nextColor(int index) const;
 
     public:
-        Universe(unsigned int universe = 1) : universeID(universe) {}
+        Universe(unsigned int universe = 1) : universeID(universe) {};
 
         void fillBytesPatched(int start, int end);
         bool add(Light &fragment, int start = -1);
         inline const unsigned int numLights() const { return lights.size(); }
         inline const unsigned int getUniverseID() const { return universeID; }
-        inline Light *getLight(int index) { return &lights[index]; }
+        Light *getLight(int index)
+        {
+            auto it = lights.begin();
+            size_t current = 0;
+
+            while (it != lights.end())
+            {
+                if (current == index)
+                {
+                    return &(*it);
+                }
+                ++it;
+                ++current;
+            }
+        }
         std::vector<Light *> getLights(std::string name);
 
         Light &operator[](int index);

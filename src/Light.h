@@ -111,6 +111,7 @@ namespace DMX
         // map group name to group
         std::unordered_map<std::string, std::vector<Group>> m_groupMap;
 
+        Light() = default;
         // create a light with name using a sequence of patch units
         Light(std::string name, std::vector<LightPatchUnit> patchUnits, bool inverted = false, bool standalone = false);
 

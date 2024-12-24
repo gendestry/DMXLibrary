@@ -1,6 +1,7 @@
 #include "Universe.h"
 #include <iostream>
 #include <cmath>
+#include <iterator>
 
 #include "Utils.h"
 
@@ -49,11 +50,12 @@ namespace DMX
     {
         params.globalSize = 0;
         params.offsetGlobal = 0;
-        auto lights = group();
+        auto &lights = group();
 
         for (Light *light : lights)
         {
             params.globalSize += (*light)[groupName].size();
+            // light->print();
         }
 
         for (Light *light : lights)
@@ -87,8 +89,8 @@ namespace DMX
 
     bool Universe::add(Light &fragment, int start)
     {
-        static int neki = 1;
-        // std::cout << neki++ << ":" << std::endl;
+        // static int neki = 1;
+        // std::cout << neki++ << ":";
         if (lights.empty())
         {
             int size = fragment.getSize();
@@ -113,7 +115,7 @@ namespace DMX
         // insert next
         if (start == -1)
         {
-            auto &frag = lights[lights.size() - 1];
+            auto &frag = lights.back();
 
             // if segment fits at end
             if (frag.start + frag.getSize() + fragment.getSize() <= MAX_SIZE)
@@ -123,7 +125,7 @@ namespace DMX
                 fragment.m_bytes = &m_bytes[fragment.start];
                 fragment.m_ID = Light::incrementID(fragment.m_Name);
                 // printf("Start: %d, End: %d\n", fragment.start, fragment.start + fragment.getSize());
-                // printf("Ptr: %p\n", fragment.m_bytes);
+                // printf("Ptr: %p\n", fragment);
                 // printf("Ptr")
                 // std::cout << lights.size() << std::endl;
                 // try
@@ -144,12 +146,15 @@ namespace DMX
             unsigned int size = fragment.getSize();
             for (int i = 0; i < lights.size(); i++)
             {
-                auto &current = lights[i];
+                auto it = lights.begin();
+                std::advance(it, i);
+                auto current = *it;
 
                 // not last segment
                 if (i < lights.size() - 1)
                 {
-                    auto &next = lights[i + 1];
+                    std::advance(it, 1);
+                    auto &next = *it;
                     if (start >= current.start && start < current.start + current.getSize())
                     {
                         std::cout << "Segment within bounds" << std::endl;
@@ -167,7 +172,8 @@ namespace DMX
                         fragment.m_bytes = &m_bytes[fragment.start];
                         fragment.m_ID = Light::incrementID(fragment.m_Name);
 
-                        lights.insert(lights.begin() + i + 1, fragment);
+                        //                        lights.insert(lights.begin() + i + 1, fragment);
+                        lights.insert(it, fragment);
                         fillBytesPatched(start, start + size);
                         return true;
                     }
@@ -216,13 +222,21 @@ namespace DMX
     std::vector<Light *> Universe::getLights(std::string name)
     {
         std::vector<Light *> result;
-        for (Light &light : lights)
+        for (auto it = lights.begin(); it != lights.end(); ++it)
         {
-            if (light.m_Name == name)
+            // std::cout << it->m_ID << " " << it->start << std::endl;
+            if (it->m_Name == name)
             {
-                result.push_back(&light);
+                result.push_back(&(*it));
             }
         }
+        // for (auto light : lights)
+        // {
+        //     if (light.m_Name == name)
+        //     {
+        //         result.push_back(&light);
+        //     }
+        // }
         return result;
     }
 
@@ -232,7 +246,9 @@ namespace DMX
         {
             throw std::runtime_error("Index out of bounds");
         }
-        return lights[index];
+        auto it = lights.begin();
+        std::advance(it, index);
+        return *it;
     }
 
     std::vector<uint8_t> Universe::getBytes() const
@@ -241,7 +257,9 @@ namespace DMX
         int index = 0;
         for (int i = 0; i < lights.size(); i++)
         {
-            const auto &curr = lights[i];
+            auto it = lights.begin();
+            std::advance(it, i);
+            const auto &curr = *it;
             uint8_t *currBytes = curr.getBytes();
 
             for (int j = curr.start; j < curr.start + curr.getSize(); j++)
@@ -262,7 +280,11 @@ namespace DMX
         for (int i = 0; i < lights.size(); i++)
         {
             const int offset = 0;
-            auto &curr = lights[i];
+
+            auto it = lights.begin();
+            std::advance(it, i);
+            auto &curr = *it;
+
             int cstart = curr.start;
             int cnext = curr.start + curr.getSize();
             int cend = curr.start + curr.getSize() - 1;
@@ -278,7 +300,8 @@ namespace DMX
 
             if (i < lights.size() - 1)
             {
-                auto &next = lights[i + 1];
+                std::advance(it, 1);
+                auto &next = *it;
                 if (curr.start + curr.getSize() != next.start)
                 {
                     printf("\x1B[2m[%3d, %3d]\x1B[3m%s Unpatched %s\n", cnext + offset + printableOffset, next.start - 1 + offset + printableOffset, colorItalic.c_str(), colorReset.c_str());

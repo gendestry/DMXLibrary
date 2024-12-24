@@ -59,8 +59,7 @@ namespace DMX
             return *this;
         }
 
-        // TODO fix memory
-        inline std::vector<Light *> operator()()
+        inline const std::vector<Light *> &operator()()
         {
             return lights;
         }
