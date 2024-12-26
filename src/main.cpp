@@ -62,45 +62,6 @@ int main()
     par.addGroup(rgb);
 
     Universe u1(1);
-    // u1.add(light);
-    // u1.add(light, 9);
-    // u1.add(light, 5);
-    // // u1.add(light);
-    // u1.add(light);
-    // u1.add(light);
-    // std::cout << u1[0].start << std::endl;
-    // std::cout << u1[1].start << std::endl;
-    // std::cout << u1[2].start << std::endl;
-    // std::cout << u1[3].start << std::endl;
-    // applyFunctionToLights()
-    // applyFunctionToLights()
-    // u1[0].setGroup("RGB", 0, {255, 0, 0});
-
-    // u1.add(light);
-    // u1.add(light);
-    // u1.add(light);
-    // u1.add(light);
-
-    // for (auto l : u1.getLights("LedBar"))
-    // {
-    //     l->print();
-    // }
-
-    // LightGroup lg;
-    // lg += u1["LedBar"];
-
-    // applyFunctionToLights(lg, "RGB", params, [](EffectParams &params, std::vector<std::vector<int>> &values)
-    //                       { values[params.localId] = {180, 110, 30}; });
-    // applyFunctionToLights(lg, "RGB", params, globalRedBlueLambda);
-
-    // applyFunctionToLights(lg, "RGB", params, coloriseLambda);
-    // lg += u1.getLights("LedBar");
-    // applyFunctionToLights(u1.getLights("LedPar"), "RGB", params, globalSnake);
-    // applyFunctionToLights(u1.getLights("LedPar"), "RGB", params, coloriseLambda);
-
-    // u1.print();
-
-    // return 0;
     Universe u2(2);
 
     for (int i = 0; i < 30; i++)
@@ -112,10 +73,10 @@ int main()
         u1.add(par);
     }
 
-    for (int i = 0; i < 17; i++)
-    {
-        u2.add(light);
-    }
+    // for (int i = 0; i < 17; i++)
+    // {
+    //     u2.add(light);
+    // }
     for (int i = 0; i < 7; i++)
     {
         u2.add(par);
@@ -164,8 +125,8 @@ int main()
 
     std::cout << std::endl;
 
-    u1.print();
-    u2.print();
+    // u1.print();
+    // u2.print();
 
     // EffectFn redBlueLambda = [](EffectParams &params, std::vector<std::vector<int>> &values)
     // {

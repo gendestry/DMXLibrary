@@ -92,7 +92,6 @@ namespace DMX
         unsigned int m_ID;
         static std::unordered_map<std::string, unsigned int> m_currentIndex;
 
-        bool m_inverted = false;
         bool m_standalone = false;
 
         // the byte values of the light
@@ -113,10 +112,10 @@ namespace DMX
 
         Light() = default;
         // create a light with name using a sequence of patch units
-        Light(std::string name, std::vector<LightPatchUnit> patchUnits, bool inverted = false, bool standalone = false);
+        Light(std::string name, std::vector<LightPatchUnit> patchUnits, bool standalone = false);
 
         // create a light with name using a group and amount of said groups
-        Light(std::string name, Group group, unsigned int numGroups, bool inverted = false, bool standalone = false);
+        Light(std::string name, Group group, unsigned int numGroups, bool standalone = false);
 
         ~Light();
 

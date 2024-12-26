@@ -20,11 +20,9 @@ namespace DMX
     class Universe
     {
         unsigned int universeID;
-
-        // std::vector<Light> lights;
         std::list<Light> lights;
-
         std::unordered_map<std::string, std::vector<std::reference_wrapper<Light>>> ligthsByName;
+
         uint8_t m_bytes[MAX_SIZE] = {0};
         unsigned int bytesPatched[MAX_SIZE] = {0};
 
@@ -37,21 +35,7 @@ namespace DMX
         bool add(Light &fragment, int start = -1);
         inline const unsigned int numLights() const { return lights.size(); }
         inline const unsigned int getUniverseID() const { return universeID; }
-        Light *getLight(int index)
-        {
-            auto it = lights.begin();
-            size_t current = 0;
-
-            while (it != lights.end())
-            {
-                if (current == index)
-                {
-                    return &(*it);
-                }
-                ++it;
-                ++current;
-            }
-        }
+        Light *getLight(int index);
         std::vector<Light *> getLights(std::string name);
 
         Light &operator[](int index);

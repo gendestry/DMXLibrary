@@ -93,7 +93,7 @@ namespace DMX
     }
 
     /* ===== LIGHT CLASS ===== */
-    Light::Light(std::string name, std::vector<LightPatchUnit> patchUnits, bool inverted, bool standalone) : m_Name(name), m_patchID(patchUnits), m_inverted(inverted), m_standalone(standalone)
+    Light::Light(std::string name, std::vector<LightPatchUnit> patchUnits, bool standalone) : m_Name(name), m_patchID(patchUnits), m_standalone(standalone)
     {
         unsigned int counter = 0;
         for (unsigned int i = 0; i < patchUnits.size(); i++)
@@ -111,7 +111,7 @@ namespace DMX
             m_bytes = new uint8_t[m_size];
     }
 
-    Light::Light(std::string name, Group group, unsigned int numGroups, bool inverted, bool standalone) : m_Name(name), m_inverted(inverted), m_standalone(standalone)
+    Light::Light(std::string name, Group group, unsigned int numGroups, bool standalone) : m_Name(name), m_standalone(standalone)
     {
         m_size = group.getGroupFootprint() * numGroups;
 

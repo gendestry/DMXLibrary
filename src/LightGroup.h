@@ -5,6 +5,11 @@
 namespace DMX
 {
 
+    /*
+        OPERATORS:
+         += Adds lights
+         -= Adds lights inverse
+    */
     struct LightGroup
     {
         std::vector<Light *> lights;
@@ -56,6 +61,19 @@ namespace DMX
         {
             auto otherLights = other();
             this->lights.insert(this->lights.end(), otherLights.begin(), otherLights.end());
+            return *this;
+        }
+
+        LightGroup &operator-=(const std::vector<Light *> &lights)
+        {
+            this->lights.insert(this->lights.end(), lights.rbegin(), lights.rend());
+            return *this;
+        }
+
+        LightGroup &operator-=(LightGroup &other)
+        {
+            auto otherLights = other();
+            this->lights.insert(this->lights.end(), otherLights.rbegin(), otherLights.rend());
             return *this;
         }
 

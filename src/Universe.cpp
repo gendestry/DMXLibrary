@@ -89,8 +89,6 @@ namespace DMX
 
     bool Universe::add(Light &fragment, int start)
     {
-        // static int neki = 1;
-        // std::cout << neki++ << ":";
         if (lights.empty())
         {
             int size = fragment.getSize();
@@ -120,22 +118,9 @@ namespace DMX
             // if segment fits at end
             if (frag.start + frag.getSize() + fragment.getSize() <= MAX_SIZE)
             {
-                // std::cout << "Segment fits at end" << std::endl;
                 fragment.start = frag.start + frag.getSize();
                 fragment.m_bytes = &m_bytes[fragment.start];
                 fragment.m_ID = Light::incrementID(fragment.m_Name);
-                // printf("Start: %d, End: %d\n", fragment.start, fragment.start + fragment.getSize());
-                // printf("Ptr: %p\n", fragment);
-                // printf("Ptr")
-                // std::cout << lights.size() << std::endl;
-                // try
-                // {
-                //     lights.push_back(fragment);
-                // }
-                // catch (std::exception &e)
-                // {
-                //     std::cout << e.what() << std::endl;
-                // }
                 lights.push_back(fragment);
                 fillBytesPatched(fragment.start, fragment.start + fragment.getSize());
                 return true;
@@ -172,7 +157,6 @@ namespace DMX
                         fragment.m_bytes = &m_bytes[fragment.start];
                         fragment.m_ID = Light::incrementID(fragment.m_Name);
 
-                        //                        lights.insert(lights.begin() + i + 1, fragment);
                         lights.insert(it, fragment);
                         fillBytesPatched(start, start + size);
                         return true;
@@ -219,24 +203,34 @@ namespace DMX
         return false;
     }
 
+    Light *Universe::getLight(int index)
+    {
+        auto it = lights.begin();
+        size_t current = 0;
+
+        while (it != lights.end())
+        {
+            if (current == index)
+            {
+                return &(*it);
+            }
+            ++it;
+            ++current;
+        }
+
+        return nullptr;
+    }
+
     std::vector<Light *> Universe::getLights(std::string name)
     {
         std::vector<Light *> result;
         for (auto it = lights.begin(); it != lights.end(); ++it)
         {
-            // std::cout << it->m_ID << " " << it->start << std::endl;
             if (it->m_Name == name)
             {
                 result.push_back(&(*it));
             }
         }
-        // for (auto light : lights)
-        // {
-        //     if (light.m_Name == name)
-        //     {
-        //         result.push_back(&light);
-        //     }
-        // }
         return result;
     }
 
@@ -273,7 +267,6 @@ namespace DMX
 
     void Universe::printFragments() const
     {
-        // std::cout << "Segments: " << segments.size() << std::endl;
         constexpr unsigned int printableOffset = 1;
         std::string col;
 
