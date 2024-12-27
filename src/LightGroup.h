@@ -1,5 +1,7 @@
 #pragma once
 #include <vector>
+#include <functional>
+
 #include "Light.h"
 
 namespace DMX
@@ -83,4 +85,8 @@ namespace DMX
         }
     };
 
+    bool applyFunctionToLights(std::vector<std::reference_wrapper<Light>> lights, std::string groupName, EffectParams params, EffectFn fun);
+    bool applyFunctionToLights(std::vector<Light *> lights, std::string groupName, EffectParams params, EffectFn fun);
+
+    bool applyFunctionToLights(LightGroup &group, std::string groupName, EffectParams params, EffectFn fun);
 };

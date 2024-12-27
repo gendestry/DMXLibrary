@@ -5,14 +5,17 @@ debug: bin/main-debug
 
 FILES = $(wildcard src/*.cpp)
 
-bin/main: $(FILES)
+bin/main: $(FILES) | bin
 	@g++ $^ -O3 --std=c++17 -o $@
 
-bin/main-debug: $(FILES)
+bin/main-debug: $(FILES) | bin
 	g++ $^ -g --std=c++17 -o $@
 
 run: bin/main
 	@./$^
+
+bin:
+	mkdir -p $@
 
 clean:
 	rm bin/*

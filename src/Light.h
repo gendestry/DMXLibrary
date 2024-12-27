@@ -3,6 +3,7 @@
 #include <vector>
 #include <unordered_map>
 #include <string.h>
+#include <stdint.h>
 
 const std::string colorGreen = "\x1B[32m";
 const std::string colorYellow = "\x1B[33m";
@@ -10,6 +11,15 @@ const std::string colorBlue = "\x1B[34m";
 const std::string colorReset = "\x1B[0m";
 const std::string colorDim = "\x1B[2m";
 const std::string colorItalic = "\x1B[3m";
+
+struct EffectParams
+{
+    int globalSize = -1, offsetGlobal = 0, localSize = -1, localId = -1, tick;
+    void *other;
+    EffectParams(int tick = 0, void *other = nullptr) : tick(tick), other(other) {}
+};
+
+typedef void (*EffectFn)(EffectParams &params, std::vector<std::vector<int>> &values);
 
 namespace DMX
 {
@@ -41,14 +51,14 @@ namespace DMX
                                                   : x == Strobo16 ? "Strobo16" \
                                                                   : "Unknown")
 
-    struct EffectParams
-    {
-        int globalSize = -1, offsetGlobal = 0, localSize = -1, localId = -1, tick;
-        void *other;
-        EffectParams(int tick = 0, void *other = nullptr) : tick(tick), other(other) {}
-    };
+    // struct EffectParams
+    // {
+    //     int globalSize = -1, offsetGlobal = 0, localSize = -1, localId = -1, tick;
+    //     void *other;
+    //     EffectParams(int tick = 0, void *other = nullptr) : tick(tick), other(other) {}
+    // };
 
-    typedef void (*EffectFn)(EffectParams &params, std::vector<std::vector<int>> &values);
+    // typedef void (*EffectFn)(EffectParams &params, std::vector<std::vector<int>> &values);
 
     struct Light
     {
