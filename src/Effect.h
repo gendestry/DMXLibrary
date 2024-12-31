@@ -67,7 +67,6 @@ struct FX
     void apply(std::string name, EffectParams &params)
     {
         std::vector<Effect *> effects = get<Intensity>();
-
         // std::cout << "Applying intensity effects " << effects.size() << std::endl;
         for (Effect *effect : effects)
         {

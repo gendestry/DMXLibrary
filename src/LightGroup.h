@@ -89,4 +89,6 @@ namespace DMX
     bool applyFunctionToLights(std::vector<Light *> lights, std::string groupName, EffectParams params, EffectFn fun);
 
     bool applyFunctionToLights(LightGroup &group, std::string groupName, EffectParams params, EffectFn fun);
+
+    // bool applyFunctionToGlobalLights(std::vector<std::vector<Light *>> lights, std::string groupName, EffectParams params, EffectFn fun);
 };

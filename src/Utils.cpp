@@ -2,6 +2,7 @@
 #include <sstream>
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 
 namespace Utils
 {
@@ -139,6 +140,68 @@ namespace Utils
         return {static_cast<int>(r * 255.0f),
                 static_cast<int>(g * 255.0f),
                 static_cast<int>(b * 255.0f)};
+    }
+
+    std::vector<float> getSegments(int numSegments, int segmentSize, int totalSize, int offset, SegmentOptions opt)
+    {
+        std::vector<float> segments(totalSize, 0.0f);
+
+        for (int i = 0; i < numSegments; i++)
+        {
+            int tail = (((int)(totalSize / numSegments) * i) + offset) % totalSize;
+            for (int j = 0; j < segmentSize; j++)
+            {
+                int index = (tail + j) % totalSize;
+                float step = (j / (float)(segmentSize - 1.f));
+                if (opt == Sin)
+                {
+                    segments[index] = sin(M_PI * step);
+                }
+                else if (opt == Saw)
+                {
+                    segments[index] = step;
+                }
+                else if (opt == InvSaw)
+                {
+                    segments[index] = 1.0f - step;
+                }
+                else
+                {
+                    segments[index] = 1.0f;
+                }
+            }
+        }
+
+        return segments;
+    }
+
+    std::vector<std::vector<int>> getGradient(int numElements, std::vector<std::vector<int>> colors, std::vector<float> percentages)
+    {
+        if (percentages.size() != colors.size() || percentages.size() > numElements)
+            return {};
+
+        std::vector<std::vector<int>> gradient(numElements, std::vector<int>(3, 0));
+        int start = 0;
+        for (int i = 0; i < colors.size() - 1; i++)
+        {
+            float percentage = percentages[i];
+            int end = start + percentage * numElements;
+            if (i == colors.size() - 2)
+                end = numElements;
+            auto &startColor = colors[i];
+            std::vector<int> &endColor = i == colors.size() - 1 ? colors[i] : colors[i + 1];
+            for (int j = start; j < end; j++)
+            {
+                float ratio = (j - start) / (float)(end - start - 1);
+                for (int k = 0; k < 3; k++)
+                {
+                    gradient[j][k] = startColor[k] * (1 - ratio) + endColor[k] * ratio;
+                }
+            }
+            start += percentage * numElements;
+        }
+
+        return gradient;
     }
 
 };

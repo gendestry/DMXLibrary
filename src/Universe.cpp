@@ -101,7 +101,6 @@ namespace DMX
 
                 lights.push_back(fragment);
                 fillBytesPatched(startOffset, startOffset + size);
-                return true;
             }
             else
             {
@@ -123,7 +122,6 @@ namespace DMX
                 fragment.m_ID = Light::incrementID(fragment.m_Name);
                 lights.push_back(fragment);
                 fillBytesPatched(fragment.start, fragment.start + fragment.getSize());
-                return true;
             }
         }
         else
@@ -159,7 +157,6 @@ namespace DMX
 
                         lights.insert(it, fragment);
                         fillBytesPatched(start, start + size);
-                        return true;
                     }
                     else
                     {
@@ -189,7 +186,6 @@ namespace DMX
 
                         lights.push_back(fragment);
                         fillBytesPatched(start, start + size);
-                        return true;
                     }
                     else
                     {
@@ -199,8 +195,8 @@ namespace DMX
                 }
             }
         }
-
-        return false;
+        ligthsByName[fragment.m_Name].push_back(getLight(lights.size() - 1));
+        return true;
     }
 
     Light *Universe::getLight(int index)
@@ -223,15 +219,16 @@ namespace DMX
 
     std::vector<Light *> Universe::getLights(std::string name)
     {
-        std::vector<Light *> result;
-        for (auto it = lights.begin(); it != lights.end(); ++it)
-        {
-            if (it->m_Name == name)
-            {
-                result.push_back(&(*it));
-            }
-        }
-        return result;
+        // std::vector<Light *> result;
+        // for (auto it = lights.begin(); it != lights.end(); ++it)
+        // {
+        //     if (it->m_Name == name)
+        //     {
+        //         result.push_back(&(*it));
+        //     }
+        // }
+        // return result;
+        return ligthsByName[name];
     }
 
     Light &Universe::operator[](int index)
@@ -243,6 +240,26 @@ namespace DMX
         auto it = lights.begin();
         std::advance(it, index);
         return *it;
+    }
+
+    std::vector<Light *> Universe::operator[](LightsInterval interval)
+    {
+        int start = interval.start;
+        int end = interval.end;
+        auto &all = ligthsByName[interval.name];
+
+        if (start >= all.size() || end >= all.size())
+        {
+            throw std::runtime_error("Index out of bounds");
+        }
+
+        std::vector<Light *> result;
+        for (int i = start; i <= end; i++)
+        {
+            result.push_back(all[i]);
+        }
+
+        return result;
     }
 
     std::vector<uint8_t> Universe::getBytes() const

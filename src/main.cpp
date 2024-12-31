@@ -2,6 +2,7 @@
 #include <thread>
 #include <chrono>
 #include <cmath>
+#include <memory>
 #include "Universe.h"
 #include "Utils.h"
 #include "LightGroup.h"
@@ -12,15 +13,26 @@ using namespace DMX;
 
 int main()
 {
-    EffectFn intensityFun = [](EffectParams &params, std::vector<std::vector<int>> &values)
+
+    struct ParamsPtr
     {
-        auto &v = values[params.localId];
-        float intensity = 0.6f;
-        int value = (int)(intensity * 255);
-        v = {value, value, value};
+        float intensity;
+        int numSegments;
+        int segmentSize;
+        int color[3];
     };
 
-    EffectFn oddEvenIntensityFun = [](EffectParams &params, std::vector<std::vector<int>> &values)
+    EffectFn intensityMaster = [](EffectParams &params, std::vector<std::vector<int>> &values)
+    {
+        auto &v = values[params.localId];
+        ParamsPtr *ptr = (ParamsPtr *)params.other;
+        float intensity = ptr->intensity;
+        int value = (int)(intensity * 255);
+        std::for_each(v.begin(), v.end(), [&value](int &i)
+                      { i = std::max(i, value); });
+    };
+
+    EffectFn intensityOddEven = [](EffectParams &params, std::vector<std::vector<int>> &values)
     {
         auto &v = values[params.localId];
         int globalId = params.offsetGlobal + params.localId;
@@ -28,23 +40,60 @@ int main()
             return;
         float intensity = 1.f;
         int value = (int)(intensity * 255);
-        v = {value, value, value};
+        std::for_each(v.begin(), v.end(), [&value](int &i)
+                      { i = std::max(i, value); });
     };
 
-    EffectFn snakeIntensityFun = [](EffectParams &params, std::vector<std::vector<int>> &values)
+    EffectFn intensitySnake = [](EffectParams &params, std::vector<std::vector<int>> &values)
+    {
+        ParamsPtr *ptr = (ParamsPtr *)params.other;
+        int numSegments = ptr->numSegments;
+        int segmentSize = ptr->segmentSize;
+        Utils::SegmentOptions opt = Utils::SegmentOptions::Sin;
+        int index = params.offsetGlobal + params.localId;
+        int tick = params.tick;
+        int n = params.globalSize;
+        auto &v = values[params.localId];
+
+        std::vector<float> segs;
+        segs = Utils::getSegments(numSegments, segmentSize, n, tick, opt);
+
+        int val = (int)(255.f * segs[index]);
+        v = {val, val, val};
+    };
+
+    EffectFn colorGradient = [](EffectParams &params, std::vector<std::vector<int>> &values)
+    {
+        int index = params.offsetGlobal + params.localId;
+        int tick = params.tick;
+        int n = params.globalSize;
+        auto &v = values[params.localId];
+        auto gradient = Utils::getGradient(n, {{100, 180, 200}, {180, 80, 10}}, {0.5f, 0.5f})[(index + tick) % n];
+        auto hsv = Utils::rgbToHsv(gradient);
+        hsv[2] = v[0] / 255.f;
+        v = Utils::hsvToRgb(hsv);
+    };
+
+    EffectFn colorRedBlue = [](EffectParams &params, std::vector<std::vector<int>> &values)
     {
         auto &v = values[params.localId];
         int globalId = params.offsetGlobal + params.localId;
-        // if(params.tick <)
+        int red = (std::sin(M_PI * ((globalId + params.tick) % params.globalSize) / params.globalSize)) * 255;
+        int blue = (std::sin(M_PI * ((globalId + params.tick + params.globalSize / 2) % params.globalSize) / params.globalSize)) * 255;
+        auto hsv = Utils::rgbToHsv({red, 0, blue});
+        hsv[2] = v[0] / 255.f;
+        v = Utils::hsvToRgb(hsv);
     };
 
-    EffectFn globalRedBlueLambda = [](EffectParams &params, std::vector<std::vector<int>> &values)
+    EffectFn colorSingleColor = [](EffectParams &params, std::vector<std::vector<int>> &values)
     {
         auto &v = values[params.localId];
         int globalId = params.offsetGlobal + params.localId;
-        v[0] *= (std::sin(M_PI * ((globalId + params.tick) % params.globalSize) / params.globalSize));
-        v[1] = 0;
-        v[2] *= (std::sin(M_PI * ((globalId + params.tick + params.globalSize / 2) % params.globalSize) / params.globalSize));
+        ParamsPtr *ptr = (ParamsPtr *)params.other;
+        auto &other = ptr->color;
+        auto color = Utils::rgbToHsv({other[0], other[1], other[2]});
+        color[2] = v[0] / 255.f;
+        v = Utils::hsvToRgb(color);
     };
 
     EffectFn coloriseLambda = [](EffectParams &params, std::vector<std::vector<int>> &values)
@@ -53,267 +102,63 @@ int main()
         std::cout << Utils::colorByRGB(v[0], v[1], v[2], false) << "  " << colorReset;
     };
 
-    EffectFn globalSnake = [](EffectParams &params, std::vector<std::vector<int>> &values)
-    {
-        auto &v = values[params.localId];
-        int n = params.globalSize;
-        const int size = 5;
-        int tick = (params.tick - size) % n;
-        int i = params.offsetGlobal + params.localId;
-
-        int tail = tick % n;
-        int head = (size + tick) % n;
-        if (head < tail)
-        {
-            if (i >= tail || i <= head)
-                v = {255, 255, 255};
-            else
-                v = {0, 0, 0};
-        }
-        else
-        {
-            if (i >= tail && i <= head)
-                v = {255, 255, 255};
-            else
-                v = {0, 0, 0};
-        }
-    };
-
     Light::Group rgb("RGB", {R, G, B});
     Light light("Pixel", rgb, 1);
-    Universe u1(1);
+    Light par("Par", {R, G, B, Dimmer, Strobo});
+    par.addGroup(rgb);
 
-    for (int i = 0; i < 40; i++)
+    Universe u1(1);
+    Universe u2(2);
+
+    for (int i = 0; i < 30; i++)
+    {
+        u2.add(par);
+    }
+    for (int i = 0; i < 60; i++)
     {
         u1.add(light);
     }
 
-    u1[0].setGroup("RGB", 0, {255, 0, 0});
-    u1[1].setGroup("RGB", 0, {255, 0, 0});
-
-    LightGroup ledbar;
+    LightGroup ledbar, pars, all;
     ledbar += u1["Pixel"];
+    pars += u2["Par"];
+    all += u2[(LightsInterval){"Par", 0, 14}];
+    all += ledbar;
+    all += u2[(LightsInterval){"Par", 15, 29}];
+
+    IntensityEffect iSnakeFx(intensitySnake);
+    IntensityEffect iMasterFx(intensityMaster);
+    IntensityEffect iOddEvenFx(intensityOddEven);
+    ColorEffect cRedBlueFx(colorRedBlue);
+    ColorEffect cGradientFx(colorGradient);
+    ColorEffect cSingleColorFx(colorSingleColor);
+    OtherEffect oColoriseFx(coloriseLambda);
 
     FX fx(ledbar);
-    IntensityEffect ie(globalSnake);
-    IntensityEffect ie2(oddEvenIntensityFun);
-    ColorEffect ce(globalRedBlueLambda);
-    OtherEffect oe(coloriseLambda);
-    fx.add<Intensity>(&ie);
-    // fx.add<Intensity>(&ie2);
-    fx.add<Color>(&ce);
-    fx.add<Other>(&oe);
+    fx.add<Intensity>(&iSnakeFx);
+    fx.add<Color>(&cSingleColorFx);
+
+    FX fx2(pars);
+    fx2.add<Intensity>(&iMasterFx);
+    fx2.add<Intensity>(&iOddEvenFx);
+    fx2.add<Color>(&cRedBlueFx);
+
+    FX fx3(all);
+    fx3.add<Other>(&oColoriseFx);
 
     EffectParams params;
+    ParamsPtr ptr = {0.5f, 4, 10, {80, 200, 140}};
+    params.other = (void *)&ptr;
     for (int i = 0; i < 100; i++)
     {
         params.tick = i;
         fx.apply("RGB", params);
-
+        fx2.apply("RGB", params);
+        fx3.apply("RGB", params);
         std::cout.flush();
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
         std::cout << "\r";
     }
-    std::cout << std::endl;
 
     return 0;
-
-    // EffectFn globalRedBlueLambda = [](EffectParams &params, std::vector<std::vector<int>> &values)
-    // {
-    //     auto &v = values[params.localId];
-    //     int globalId = params.offsetGlobal + params.localId;
-    //     v[0] = (int)(std::sin(M_PI * ((globalId + params.tick) % params.globalSize) / params.globalSize) * 255);
-    //     v[1] = 0;
-    //     v[2] = (int)(std::sin(M_PI * ((globalId + params.tick + params.globalSize / 2) % params.globalSize) / params.globalSize) * 255);
-    // };
-
-    // EffectFn globalSnake = [](EffectParams &params, std::vector<std::vector<int>> &values)
-    // {
-    //     auto &v = values[params.localId];
-    //     float globalId = (float)params.offsetGlobal + params.localId;
-    //     if (params.tick % params.globalSize == globalId)
-    //     {
-    //         auto rgb = Utils::hsvToRgb({(globalId / params.globalSize * 359.0f), 1.0, 1.0});
-    //         v[0] = rgb[0];
-    //         v[1] = rgb[1];
-    //         v[2] = rgb[2];
-    //     }
-    //     else
-    //     {
-    //         auto hsv = Utils::rgbToHsv(v);
-    //         hsv[2] *= 0.9;
-    //         auto rgb = Utils::hsvToRgb(hsv);
-    //         v[0] = rgb[0];
-    //         v[1] = rgb[1];
-    //         v[2] = rgb[2];
-    //     }
-    // };
-
-    // EffectParams params;
-
-    // Light::Group rgb("RGB", {R, G, B});
-    // Light light("LedBar", rgb, 1);
-    // Light par("Par", {R, G, B, Dimmer, Strobo});
-    // par.addGroup(rgb);
-
-    // Universe u1(1);
-    // Universe u2(2);
-
-    // for (int i = 0; i < 30; i++)
-    // {
-    //     u1.add(light);
-    // }
-    // for (int i = 0; i < 10; i++)
-    // {
-    //     u1.add(par);
-    // }
-
-    // // for (int i = 0; i < 17; i++)
-    // // {
-    // //     u2.add(light);
-    // // }
-    // for (int i = 0; i < 7; i++)
-    // {
-    //     u2.add(par);
-    // }
-
-    // LightGroup ledbars;
-    // LightGroup pars;
-    // LightGroup both;
-
-    // ledbars += u1["LedBar"];
-    // pars += u1["Par"];
-    // pars += u2["Par"];
-    // both += u1["Par"];
-    // both += ledbars;
-    // both += u2["Par"];
-
-    // applyFunctionToLights(both, "RGB", params, [](EffectParams &params, std::vector<std::vector<int>> &values)
-    //                       { values[params.localId] = {180, 110, 30}; });
-    // applyFunctionToLights(both, "RGB", params, coloriseLambda);
-
-    // std::cout.flush();
-    // std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-    // std::cout << "\r";
-
-    // applyFunctionToLights(ledbars, "RGB", params, [](EffectParams &params, std::vector<std::vector<int>> &values)
-    //                       { values[params.localId] = {30, 180, 110}; });
-    // applyFunctionToLights(pars, "RGB", params, [](EffectParams &params, std::vector<std::vector<int>> &values)
-    //                       { values[params.localId] = {30, 110, 180}; });
-    // applyFunctionToLights(both, "RGB", params, coloriseLambda);
-
-    // std::cout.flush();
-    // std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-    // std::cout << "\r";
-
-    // for (int i = 0; i < 100; i++)
-    // {
-    //     params.tick = i;
-    //     applyFunctionToLights(pars, "RGB", params, globalRedBlueLambda);
-    //     applyFunctionToLights(ledbars, "RGB", params, globalSnake);
-    //     applyFunctionToLights(both, "RGB", params, coloriseLambda);
-
-    //     std::cout.flush();
-    //     std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    //     std::cout << "\r";
-    // }
-
-    // std::cout << std::endl;
-
-    // u1.print();
-    // u2.print();
-
-    // EffectFn redBlueLambda = [](EffectParams &params, std::vector<std::vector<int>> &values)
-    // {
-    //     auto &v = values[params.localId];
-    //     v[0] = (int)(std::sin(M_PI * ((params.localId + params.tick) % params.localSize) / params.localSize) * 255);
-    //     v[2] = (int)(std::sin(M_PI * ((params.localId + params.tick + params.localSize / 2) % params.localSize) / params.localSize) * 255);
-    // };
-
-    // EffectFn globalSnake = [](EffectParams &params, std::vector<std::vector<int>> &values)
-    // {
-    //     auto &v = values[params.localId];
-    //     float globalId = (float)params.offsetGlobal + params.localId;
-    //     if (params.tick % params.globalSize == globalId)
-    //     {
-    //         auto rgb = Utils::hsvToRgb({(globalId / params.globalSize * 359.0f), 1.0, 1.0});
-    //         v[0] = rgb[0];
-    //         v[1] = rgb[1];
-    //         v[2] = rgb[2];
-    //     }
-    //     else
-    //     {
-    //         auto hsv = Utils::rgbToHsv(v);
-    //         hsv[2] *= 0.9;
-    //         auto rgb = Utils::hsvToRgb(hsv);
-    //         v[0] = rgb[0];
-    //         v[1] = rgb[1];
-    //         v[2] = rgb[2];
-    //     }
-    // };
-
-    // EffectFn globalNeki = [](EffectParams &params, std::vector<std::vector<int>> &values)
-    // {
-    //     auto &v = values[params.localId];
-    //     int globalId = params.offsetGlobal + params.localId;
-    //     if (globalId < params.globalSize / 2)
-    //     {
-    //         if ((globalId + (params.tick % 10)) % 10 < 5)
-    //         {
-    //             ((EffectFn)params.other)(params, values);
-    //         }
-    //         else
-    //         {
-    //             v = {0, 0, 0};
-    //         }
-    //     }
-    //     else
-    //     {
-    //         if ((globalId - (params.tick % 10)) % 10 >= 5)
-    //         {
-    //             ((EffectFn)params.other)(params, values);
-    //         }
-    //         else
-    //         {
-    //             v = {0, 0, 0};
-    //         }
-    //     }
-    // };
-
-    // EffectFn globalSegments_Int = [](EffectParams &params, std::vector<std::vector<int>> &values)
-    // {
-    //     auto &v = values[params.localId];
-    //     int globalId = params.offsetGlobal + params.localId;
-    //     if (globalId < params.globalSize / 2)
-    //     {
-    //         if ((globalId + (params.tick % 10)) % 10 < 5)
-    //         {
-    //             v = {255, 255, 255};
-    //         }
-    //         else
-    //         {
-    //             v = {0, 0, 0};
-    //         }
-    //     }
-    //     else
-    //     {
-    //         if ((globalId - (params.tick % 10)) % 10 >= 5)
-    //         {
-    //             v = {255, 255, 255};
-    //         }
-    //         else
-    //         {
-    //             v = {0, 0, 0};
-    //         }
-    //     }
-    // };
-
-    // EffectFn globalRedBlueLambda_Col = [](EffectParams &params, std::vector<std::vector<int>> &values)
-    // {
-    //     auto &v = values[params.localId];
-    //     int globalId = params.offsetGlobal + params.localId;
-    //     v[0] *= (std::sin(M_PI * ((globalId + params.tick) % params.globalSize) / params.globalSize));
-    //     v[1] = 0;
-    //     v[2] *= (std::sin(M_PI * ((globalId + params.tick + params.globalSize / 2) % params.globalSize) / params.globalSize));
-    // };
 }
