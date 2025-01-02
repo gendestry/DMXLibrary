@@ -1,6 +1,8 @@
 #include "LightGroup.h"
 
-namespace DMX
+using DMX::Light;
+
+namespace Effect
 {
 
     bool applyFunctionToLights(std::vector<std::reference_wrapper<Light>> lights, std::string groupName, EffectParams params, EffectFn fun)

@@ -40,8 +40,11 @@ namespace DMX
 
         void fillBytesPatched(int start, int end);
         bool add(Light &fragment, int start = -1);
+        bool addMultiple(Light &fragment, int ammount, int start = -1);
+
         inline const unsigned int numLights() const { return lights.size(); }
         inline const unsigned int getUniverseID() const { return universeID; }
+
         Light *getLight(int index);
         std::vector<Light *> getLights(std::string name);
 

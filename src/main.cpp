@@ -6,10 +6,10 @@
 #include "Universe.h"
 #include "Utils.h"
 #include "LightGroup.h"
+#include "Effect.h"
 
 using namespace DMX;
-
-#include "Effect.h"
+using namespace Effect;
 
 int main()
 {
@@ -68,7 +68,7 @@ int main()
         int tick = params.tick;
         int n = params.globalSize;
         auto &v = values[params.localId];
-        auto gradient = Utils::getGradient(n, {{100, 180, 200}, {180, 80, 10}}, {0.5f, 0.5f})[(index + tick) % n];
+        auto gradient = Utils::getGradient(n, {{255, 0, 0}, {0, 0, 255}})[(index + tick) % n];
         auto hsv = Utils::rgbToHsv(gradient);
         hsv[2] = v[0] / 255.f;
         v = Utils::hsvToRgb(hsv);
@@ -103,29 +103,24 @@ int main()
     };
 
     Light::Group rgb("RGB", {R, G, B});
-    Light light("Pixel", rgb, 1);
+    Light pixel("Pixel", rgb, 1);
     Light par("Par", {R, G, B, Dimmer, Strobo});
     par.addGroup(rgb);
 
     Universe u1(1);
     Universe u2(2);
 
-    for (int i = 0; i < 30; i++)
-    {
-        u2.add(par);
-    }
-    for (int i = 0; i < 60; i++)
-    {
-        u1.add(light);
-    }
+    u1.addMultiple(pixel, 60);
+    u2.addMultiple(par, 30);
 
-    LightGroup ledbar, pars, all;
+    Effect::LightGroup ledbar, pars, all;
     ledbar += u1["Pixel"];
     pars += u2["Par"];
     all += u2[(LightsInterval){"Par", 0, 14}];
     all += ledbar;
     all += u2[(LightsInterval){"Par", 15, 29}];
 
+    using namespace Effect;
     IntensityEffect iSnakeFx(intensitySnake);
     IntensityEffect iMasterFx(intensityMaster);
     IntensityEffect iOddEvenFx(intensityOddEven);
@@ -134,16 +129,15 @@ int main()
     ColorEffect cSingleColorFx(colorSingleColor);
     OtherEffect oColoriseFx(coloriseLambda);
 
-    FX fx(ledbar);
-    fx.add<Intensity>(&iSnakeFx);
-    fx.add<Color>(&cSingleColorFx);
+    FX fx;
+    fx.add<Intensity>(&iMasterFx);
+    fx.add<Color>(&cGradientFx);
 
-    FX fx2(pars);
-    fx2.add<Intensity>(&iMasterFx);
-    fx2.add<Intensity>(&iOddEvenFx);
-    fx2.add<Color>(&cRedBlueFx);
+    FX fx2;
+    fx2.add<Intensity>(&iSnakeFx);
+    fx2.add<Color>(&cSingleColorFx);
 
-    FX fx3(all);
+    FX fx3;
     fx3.add<Other>(&oColoriseFx);
 
     EffectParams params;
@@ -152,13 +146,13 @@ int main()
     for (int i = 0; i < 100; i++)
     {
         params.tick = i;
-        fx.apply("RGB", params);
-        fx2.apply("RGB", params);
-        fx3.apply("RGB", params);
+        fx.apply(pars, "RGB", params);
+        fx2.apply(ledbar, "RGB", params);
+        fx3.apply(all, "RGB", params);
         std::cout.flush();
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
         std::cout << "\r";
     }
-
+    std::cout << std::endl;
     return 0;
 }

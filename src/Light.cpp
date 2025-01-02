@@ -318,7 +318,7 @@ namespace DMX
     }
 
     // apply a lambda function to a group at index
-    bool Light::applyFunctionToGroup(std::string name, int index, EffectParams params, EffectFn func)
+    bool Light::applyFunctionToGroup(std::string name, int index, Effect::EffectParams params, Effect::EffectFn func)
     {
         if (m_groupMap.find(name) == m_groupMap.end())
         {
@@ -337,7 +337,7 @@ namespace DMX
     }
 
     // apply a lambda function to a group at indexes
-    bool Light::applyFunctionToGroup(std::string name, std::vector<unsigned int> indexes, EffectParams params, EffectFn func)
+    bool Light::applyFunctionToGroup(std::string name, std::vector<unsigned int> indexes, Effect::EffectParams params, Effect::EffectFn func)
     {
         if (m_groupMap.find(name) == m_groupMap.end())
         {
@@ -362,7 +362,7 @@ namespace DMX
     }
 
     // apply a lambda function to all groups
-    bool Light::applyFunctionToAllGroups(std::string name, EffectParams params, EffectFn func)
+    bool Light::applyFunctionToAllGroups(std::string name, Effect::EffectParams params, Effect::EffectFn func)
     {
         if (m_groupMap.find(name) == m_groupMap.end())
         {

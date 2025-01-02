@@ -12,14 +12,16 @@ const std::string colorReset = "\x1B[0m";
 const std::string colorDim = "\x1B[2m";
 const std::string colorItalic = "\x1B[3m";
 
-struct EffectParams
+namespace Effect
 {
-    int globalSize = -1, offsetGlobal = 0, localSize = -1, localId = -1, tick;
-    void *other;
-    EffectParams(int tick = 0, void *other = nullptr) : tick(tick), other(other) {}
+    struct EffectParams
+    {
+        int globalSize = -1, offsetGlobal = 0, localSize = -1, localId = -1, tick;
+        void *other;
+        EffectParams(int tick = 0, void *other = nullptr) : tick(tick), other(other) {}
+    };
+    typedef void (*EffectFn)(EffectParams &params, std::vector<std::vector<int>> &values);
 };
-
-typedef void (*EffectFn)(EffectParams &params, std::vector<std::vector<int>> &values);
 
 namespace DMX
 {
@@ -50,15 +52,6 @@ namespace DMX
                                                   : x == Dimmer16 ? "Dimmer16" \
                                                   : x == Strobo16 ? "Strobo16" \
                                                                   : "Unknown")
-
-    // struct EffectParams
-    // {
-    //     int globalSize = -1, offsetGlobal = 0, localSize = -1, localId = -1, tick;
-    //     void *other;
-    //     EffectParams(int tick = 0, void *other = nullptr) : tick(tick), other(other) {}
-    // };
-
-    // typedef void (*EffectFn)(EffectParams &params, std::vector<std::vector<int>> &values);
 
     struct Light
     {
@@ -169,13 +162,13 @@ namespace DMX
         std::vector<std::vector<int>> getGroups(std::string name);
 
         // apply a lambda function to a group at index
-        bool applyFunctionToGroup(std::string name, int index, EffectParams params, EffectFn func);
+        bool applyFunctionToGroup(std::string name, int index, Effect::EffectParams params, Effect::EffectFn func);
 
         // apply a lambda function to a group at indexes
-        bool applyFunctionToGroup(std::string name, std::vector<unsigned int> indexes, EffectParams params, EffectFn func);
+        bool applyFunctionToGroup(std::string name, std::vector<unsigned int> indexes, Effect::EffectParams params, Effect::EffectFn func);
 
         // apply a lambda function to all groups
-        bool applyFunctionToAllGroups(std::string name, EffectParams params, EffectFn func);
+        bool applyFunctionToAllGroups(std::string name, Effect::EffectParams params, Effect::EffectFn func);
 
         // // PRINTING FUNCTIONS
         std::string toString() const noexcept;

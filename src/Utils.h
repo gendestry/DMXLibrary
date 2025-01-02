@@ -23,6 +23,6 @@ namespace Utils
     };
 
     std::vector<float> getSegments(int numSegments, int segmentSize, int totalSize, int offset, SegmentOptions opt = SegmentOptions::Sin);
-    std::vector<std::vector<int>> getGradient(int numElements, std::vector<std::vector<int>> colors, std::vector<float> percentages);
+    std::vector<std::vector<int>> getGradient(int numElements, std::vector<std::vector<int>> colors, std::vector<float> percentages = {});
 
 };

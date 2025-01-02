@@ -177,11 +177,24 @@ namespace Utils
 
     std::vector<std::vector<int>> getGradient(int numElements, std::vector<std::vector<int>> colors, std::vector<float> percentages)
     {
+        if (percentages.size() == 0)
+        {
+            for (int i = 0; i < colors.size(); i++)
+            {
+                percentages.push_back(1.f / colors.size());
+            }
+        }
         if (percentages.size() != colors.size() || percentages.size() > numElements)
             return {};
 
         std::vector<std::vector<int>> gradient(numElements, std::vector<int>(3, 0));
+        // auto percentagesMod = percentages;
+        // percentagesMod[0]
         int start = 0;
+        colors.push_back(colors[0]);
+        percentages[0] /= 2.f;
+        percentages.push_back(percentages[0]);
+
         for (int i = 0; i < colors.size() - 1; i++)
         {
             float percentage = percentages[i];
@@ -203,5 +216,63 @@ namespace Utils
 
         return gradient;
     }
+
+    /*
+
+    for (int i = 0; i < colors.size() - 1; i++)
+        {
+            float percentage = percentages[i];
+            int end = start + percentage * numElements;
+            if (i == colors.size() - 2)
+                end = numElements;
+            auto &startColor = colors[i];
+            std::vector<int> &endColor = i == colors.size() - 1 ? colors[i] : colors[i + 1];
+            for (int j = start; j < end; j++)
+            {
+                float ratio = (j - start) / (float)(end - start - 1);
+                for (int k = 0; k < 3; k++)
+                {
+                    gradient[j][k] = startColor[k] * (1 - ratio) + endColor[k] * ratio;
+                }
+            }
+            start += percentage * numElements;
+        }*/
+
+    // // hsv gradient implementation
+    // std::vector<std::vector<int>> getGradientHsv(int numElements, std::vector<std::vector<int>> colors, std::vector<float> percentages)
+    // {
+    //     if (percentages.size() != colors.size() || percentages.size() > numElements)
+    //         return {};
+
+    //     std::vector<std::vector<int>> gradient(numElements, std::vector<int>(3, 0));
+    //     int start = 0;
+    //     for (int i = 0; i < colors.size() - 1; i++)
+    //     {
+    //         float percentage = percentages[i];
+    //         int end = start + percentage * numElements;
+    //         if (i == colors.size() - 2)
+    //             end = numElements;
+    //         auto &startColor = colors[i];
+    //         std::vector<int> &endColor = i == colors.size() - 1 ? colors[i] : colors[i + 1];
+
+    //         auto startHsv = rgbToHsv(startColor);
+    //         auto endHsv = rgbToHsv(endColor);
+
+    //         for (int j = start; j < end; j++)
+    //         {
+    //             float ratio = (j - start) / (float)(end - start - 1);
+    //             gradient[j] = hsvToRgb({startHsv[0] * (1 - ratio) + endHsv[0] * ratio,
+    //                                     startHsv[1] * (1 - ratio) + endHsv[1] * ratio,
+    //                                     startHsv[2] * (1 - ratio) + endHsv[2] * ratio});
+    //             // for (int k = 0; k < 3; k++)
+    //             // {
+    //             //     gradient[j][k] = startColor[k] * (1 - ratio) + endColor[k] * ratio;
+    //             // }
+    //         }
+    //         start += percentage * numElements;
+    //     }
+
+    //     return gradient;
+    // }
 
 };

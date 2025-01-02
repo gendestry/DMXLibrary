@@ -108,94 +108,105 @@ namespace DMX
                 return false;
             }
         }
-
-        // insert next
-        if (start == -1)
-        {
-            auto &frag = lights.back();
-
-            // if segment fits at end
-            if (frag.start + frag.getSize() + fragment.getSize() <= MAX_SIZE)
-            {
-                fragment.start = frag.start + frag.getSize();
-                fragment.m_bytes = &m_bytes[fragment.start];
-                fragment.m_ID = Light::incrementID(fragment.m_Name);
-                lights.push_back(fragment);
-                fillBytesPatched(fragment.start, fragment.start + fragment.getSize());
-            }
-        }
         else
-        {
-            unsigned int size = fragment.getSize();
-            for (int i = 0; i < lights.size(); i++)
+
+            // insert next
+            if (start == -1)
             {
-                auto it = lights.begin();
-                std::advance(it, i);
-                auto current = *it;
+                auto &frag = lights.back();
 
-                // not last segment
-                if (i < lights.size() - 1)
+                // if segment fits at end
+                if (frag.start + frag.getSize() + fragment.getSize() <= MAX_SIZE)
                 {
-                    std::advance(it, 1);
-                    auto &next = *it;
-                    if (start >= current.start && start < current.start + current.getSize())
-                    {
-                        std::cout << "Segment within bounds" << std::endl;
-                        return false;
-                    }
-                    // same for next
-                    if (start >= next.start && start < next.start + next.getSize())
-                    {
-                        std::cout << "Segment within bounds" << std::endl;
-                        return false;
-                    }
-                    if (current.start + current.getSize() <= start && start + size <= next.start)
-                    {
-                        fragment.start = start;
-                        fragment.m_bytes = &m_bytes[fragment.start];
-                        fragment.m_ID = Light::incrementID(fragment.m_Name);
-
-                        lights.insert(it, fragment);
-                        fillBytesPatched(start, start + size);
-                    }
-                    else
-                    {
-                        continue;
-                    }
+                    fragment.start = frag.start + frag.getSize();
+                    fragment.m_bytes = &m_bytes[fragment.start];
+                    fragment.m_ID = Light::incrementID(fragment.m_Name);
+                    lights.push_back(fragment);
+                    fillBytesPatched(fragment.start, fragment.start + fragment.getSize());
                 }
-                else
+            }
+            else
+            {
+                unsigned int size = fragment.getSize();
+                for (int i = 0; i < lights.size(); i++)
                 {
-                    // check if segment within current segment bounds
-                    if (start >= current.start && start < current.start + current.getSize())
-                    {
-                        std::cout << "Segment within bounds 1" << std::endl;
-                        return false;
-                    }
+                    auto it = lights.begin();
+                    std::advance(it, i);
+                    auto current = *it;
 
-                    if (start >= MAX_SIZE)
+                    // not last segment
+                    if (i < lights.size() - 1)
                     {
-                        std::cout << "Segment start is out of bounds 2" << std::endl;
-                        return false;
-                    }
+                        std::advance(it, 1);
+                        auto &next = *it;
+                        if (start >= current.start && start < current.start + current.getSize())
+                        {
+                            std::cout << "Segment within bounds" << std::endl;
+                            return false;
+                        }
+                        // same for next
+                        if (start >= next.start && start < next.start + next.getSize())
+                        {
+                            std::cout << "Segment within bounds" << std::endl;
+                            return false;
+                        }
+                        if (current.start + current.getSize() <= start && start + size <= next.start)
+                        {
+                            fragment.start = start;
+                            fragment.m_bytes = &m_bytes[fragment.start];
+                            fragment.m_ID = Light::incrementID(fragment.m_Name);
 
-                    if (start + size <= MAX_SIZE)
-                    {
-                        fragment.start = start;
-                        fragment.m_bytes = &m_bytes[fragment.start];
-                        fragment.m_ID = Light::incrementID(fragment.m_Name);
-
-                        lights.push_back(fragment);
-                        fillBytesPatched(start, start + size);
+                            lights.insert(it, fragment);
+                            fillBytesPatched(start, start + size);
+                        }
+                        else
+                        {
+                            continue;
+                        }
                     }
                     else
                     {
-                        std::cout << "Segment exceeds max size" << std::endl;
-                        return false;
+                        // check if segment within current segment bounds
+                        if (start >= current.start && start < current.start + current.getSize())
+                        {
+                            std::cout << "Segment within bounds 1" << std::endl;
+                            return false;
+                        }
+
+                        if (start >= MAX_SIZE)
+                        {
+                            std::cout << "Segment start is out of bounds 2" << std::endl;
+                            return false;
+                        }
+
+                        if (start + size <= MAX_SIZE)
+                        {
+                            fragment.start = start;
+                            fragment.m_bytes = &m_bytes[fragment.start];
+                            fragment.m_ID = Light::incrementID(fragment.m_Name);
+
+                            lights.push_back(fragment);
+                            fillBytesPatched(start, start + size);
+                        }
+                        else
+                        {
+                            std::cout << "Segment exceeds max size" << std::endl;
+                            return false;
+                        }
                     }
                 }
             }
-        }
         ligthsByName[fragment.m_Name].push_back(getLight(lights.size() - 1));
+        return true;
+    }
+
+    bool Universe::addMultiple(Light &fragment, int ammount, int start)
+    {
+        for (int i = 0; i < ammount; i++)
+        {
+            if (!add(fragment, i == 0 ? start : -1))
+                return false;
+        }
         return true;
     }
 
@@ -385,5 +396,4 @@ namespace DMX
         std::cout << "Bytes: " << std::endl;
         printBytes();
     }
-
 };

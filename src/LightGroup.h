@@ -4,7 +4,7 @@
 
 #include "Light.h"
 
-namespace DMX
+namespace Effect
 {
 
     /*
@@ -14,24 +14,24 @@ namespace DMX
     */
     struct LightGroup
     {
-        std::vector<Light *> lights;
+        std::vector<DMX::Light *> lights;
 
-        inline void add(Light &light)
+        inline void add(DMX::Light &light)
         {
             lights.push_back(&light);
         }
 
-        inline void add(Light *light)
+        inline void add(DMX::Light *light)
         {
             lights.push_back(light);
         }
 
-        inline void add(std::vector<Light *> lights)
+        inline void add(std::vector<DMX::Light *> lights)
         {
             lights.insert(lights.end(), lights.begin(), lights.end());
         }
 
-        inline const std::vector<Light *> &getLights() const
+        inline const std::vector<DMX::Light *> &getLights() const
         {
             return lights;
         }
@@ -41,19 +41,19 @@ namespace DMX
             return lights.size();
         }
 
-        LightGroup &operator=(const std::vector<Light *> &lights)
+        LightGroup &operator=(const std::vector<DMX::Light *> &lights)
         {
             this->lights = lights;
             return *this;
         }
 
-        LightGroup &operator+=(Light *light)
+        LightGroup &operator+=(DMX::Light *light)
         {
             this->lights.push_back(light);
             return *this;
         }
 
-        LightGroup &operator+=(const std::vector<Light *> &lights)
+        LightGroup &operator+=(const std::vector<DMX::Light *> &lights)
         {
             this->lights.insert(this->lights.end(), lights.begin(), lights.end());
             return *this;
@@ -66,7 +66,7 @@ namespace DMX
             return *this;
         }
 
-        LightGroup &operator-=(const std::vector<Light *> &lights)
+        LightGroup &operator-=(const std::vector<DMX::Light *> &lights)
         {
             this->lights.insert(this->lights.end(), lights.rbegin(), lights.rend());
             return *this;
@@ -79,14 +79,14 @@ namespace DMX
             return *this;
         }
 
-        inline const std::vector<Light *> &operator()()
+        inline const std::vector<DMX::Light *> &operator()()
         {
             return lights;
         }
     };
 
-    bool applyFunctionToLights(std::vector<std::reference_wrapper<Light>> lights, std::string groupName, EffectParams params, EffectFn fun);
-    bool applyFunctionToLights(std::vector<Light *> lights, std::string groupName, EffectParams params, EffectFn fun);
+    bool applyFunctionToLights(std::vector<std::reference_wrapper<DMX::Light>> lights, std::string groupName, EffectParams params, EffectFn fun);
+    bool applyFunctionToLights(std::vector<DMX::Light *> lights, std::string groupName, EffectParams params, EffectFn fun);
 
     bool applyFunctionToLights(LightGroup &group, std::string groupName, EffectParams params, EffectFn fun);
 
