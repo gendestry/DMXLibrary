@@ -4,8 +4,7 @@
 #include <list>
 #include <unordered_map>
 #include <functional>
-#include "LightGroup.h"
-
+#include "../Effects/LightGroup.h"
 #include "Light.h"
 
 #define MAX_SIZE 512

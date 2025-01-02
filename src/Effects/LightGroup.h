@@ -2,7 +2,7 @@
 #include <vector>
 #include <functional>
 
-#include "Light.h"
+#include "../DMX/Light.h"
 
 namespace Effect
 {

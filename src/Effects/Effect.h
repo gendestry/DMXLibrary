@@ -23,8 +23,8 @@ namespace Effect
 
         Effect(EffectType type, EffectFn fun) : m_Type(type), m_Fun(fun) {}
 
-        volatile int getType() const { return (int)m_Type; }
-        volatile void apply(LightGroup &group, std::string groupName, EffectParams &params)
+        int getType() const { return (int)m_Type; }
+        void apply(LightGroup &group, std::string groupName, EffectParams &params)
         {
             applyFunctionToLights(group, groupName, params, m_Fun);
         }

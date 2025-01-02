@@ -3,7 +3,7 @@
 #include <cmath>
 #include <iterator>
 
-#include "Utils.h"
+#include "../Utils/Utils.h"
 
 namespace DMX
 {

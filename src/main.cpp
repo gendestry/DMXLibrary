@@ -3,10 +3,10 @@
 #include <chrono>
 #include <cmath>
 #include <memory>
-#include "Universe.h"
-#include "Utils.h"
-#include "LightGroup.h"
-#include "Effect.h"
+#include "DMX/Universe.h"
+#include "Effects/LightGroup.h"
+#include "Effects/Effect.h"
+#include "Utils/Utils.h"
 
 using namespace DMX;
 using namespace Effect;
@@ -68,7 +68,7 @@ int main()
         int tick = params.tick;
         int n = params.globalSize;
         auto &v = values[params.localId];
-        auto gradient = Utils::getGradient(n, {{255, 0, 0}, {0, 0, 255}})[(index + tick) % n];
+        auto gradient = Utils::getGradient(n, {{255, 0, 0}, {255, 255, 0}, {70, 100, 255}}, {0.4, 0.2f, 0.4f})[(index + tick) % n];
         auto hsv = Utils::rgbToHsv(gradient);
         hsv[2] = v[0] / 255.f;
         v = Utils::hsvToRgb(hsv);
@@ -135,20 +135,22 @@ int main()
 
     FX fx2;
     fx2.add<Intensity>(&iSnakeFx);
+    // fx2.add<Color>(&cGradientFx);
+
     fx2.add<Color>(&cSingleColorFx);
 
     FX fx3;
     fx3.add<Other>(&oColoriseFx);
 
     EffectParams params;
-    ParamsPtr ptr = {0.5f, 4, 10, {80, 200, 140}};
+    ParamsPtr ptr = {1.f, 1, 40, {80, 200, 140}};
     params.other = (void *)&ptr;
     for (int i = 0; i < 100; i++)
     {
         params.tick = i;
-        fx.apply(pars, "RGB", params);
+        // fx.apply(pars, "RGB", params);
         fx2.apply(ledbar, "RGB", params);
-        fx3.apply(all, "RGB", params);
+        fx3.apply(ledbar, "RGB", params);
         std::cout.flush();
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
         std::cout << "\r";
