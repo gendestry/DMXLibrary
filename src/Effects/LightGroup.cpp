@@ -45,15 +45,15 @@ namespace Effect
 
     bool applyFunctionToLights(LightGroup &group, std::string groupName, EffectParams params, EffectFn fun)
     {
-        params.globalSize = 0;
+        params.globalSize = group.getGlobalGroupSize(groupName);
         params.offsetGlobal = 0;
         auto &lights = group();
 
-        for (Light *light : lights)
-        {
-            params.globalSize += (*light)[groupName].size();
-            // light->print();
-        }
+        // for (Light *light : lights)
+        // {
+        //     params.globalSize += (*light)[groupName].size();
+        //     // light->print();
+        // }
 
         for (Light *light : lights)
         {

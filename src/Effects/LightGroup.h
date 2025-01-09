@@ -41,6 +41,16 @@ namespace Effect
             return lights.size();
         }
 
+        unsigned int getGlobalGroupSize(std::string name) const
+        {
+            unsigned int size = 0;
+            for (auto &light : lights)
+            {
+                size += (*light)[name].size();
+            }
+            return size;
+        }
+
         LightGroup &operator=(const std::vector<DMX::Light *> &lights)
         {
             this->lights = lights;

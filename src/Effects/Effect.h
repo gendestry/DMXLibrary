@@ -25,21 +25,17 @@ namespace Effect
         int step = 0;
         float bpm;
 
-        bool shouldUpdate()
+        bool shouldUpdate(unsigned int globalSize)
         {
-            float freq = 1000000.f / bpm;
+            float freq = globalSize * 1000000.f / (bpm * 60.f);
             auto microst = Utils::micros();
             auto dt = microst - oldMicros;
-            // std::cout << "BPM: " << bpm;
 
             if (dt > freq)
             {
                 oldMicros = microst;
-                // std::cout << "  " << dt << std::endl;
                 return true;
             }
-
-            // std::cout << std::endl;
 
             return false;
         }
@@ -51,11 +47,12 @@ namespace Effect
         int getType() const { return (int)m_Type; }
         void apply(LightGroup &group, std::string groupName, EffectParams &params)
         {
-            if (shouldUpdate())
+            if (shouldUpdate(group.getGlobalGroupSize(groupName)))
             {
                 step++;
             }
             params.step = step;
+            // params.globalSize = group.getGlobalGroupSize(groupName);
             applyFunctionToLights(group, groupName, params, m_Fun);
         }
     };

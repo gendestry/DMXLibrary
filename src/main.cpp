@@ -138,8 +138,8 @@ int main()
     IntensityEffect iSnakeFx(intensitySnake, 60);
     IntensityEffect iMasterFx(intensityMaster);
     IntensityEffect iOddEvenFx(intensityOddEven);
-    ColorEffect cRedBlueFx(colorRedBlue, 20);
-    ColorEffect cGradientFx(colorGradient, 30);
+    ColorEffect cRedBlueFx(colorRedBlue, 60);
+    ColorEffect cGradientFx(colorGradient, 60);
     ColorEffect cSingleColorFx(colorSingleColor);
     OtherEffect oColoriseFx(coloriseLambda);
 
@@ -148,8 +148,8 @@ int main()
     fx.add<Color>(&cRedBlueFx);
 
     FX fx2;
-    fx2.add<Intensity>(&iSnakeFx);
-    fx2.add<Color>(&cGradientFx);
+    fx2.add<Intensity>(&iMasterFx);
+    fx2.add<Color>(&cRedBlueFx);
 
     // fx2.add<Color>(&cSingleColorFx);
 
@@ -157,7 +157,7 @@ int main()
     fx3.add<Other>(&oColoriseFx);
 
     EffectParams params;
-    ParamsPtr ptr = {0.8f, 2, 28, {80, 200, 140}};
+    ParamsPtr ptr = {1.f, 2, 15, {80, 200, 140}};
     params.other = (void *)&ptr;
     // // get current time millis
     for (int i = 0;; i++)
