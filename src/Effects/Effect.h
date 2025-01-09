@@ -27,11 +27,12 @@ namespace Effect
 
         bool shouldUpdate(unsigned int globalSize)
         {
-            float freq = globalSize * 1000000.f / (bpm * 60.f);
             auto microst = Utils::micros();
             auto dt = microst - oldMicros;
 
-            if (dt > freq)
+            float timePerBeat = 1000000.f / (bpm / 60.f);
+            float updateInterval =  timePerBeat / globalSize;
+            if (dt > updateInterval)
             {
                 oldMicros = microst;
                 return true;

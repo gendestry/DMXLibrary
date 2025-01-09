@@ -35,4 +35,4 @@ bin:
 
 clean:
 	@echo "Cleaning..."
-	@rm bin/*
+	@rm -f bin/*
