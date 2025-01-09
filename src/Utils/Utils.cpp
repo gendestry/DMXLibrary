@@ -2,6 +2,7 @@
 #include <sstream>
 #include <algorithm>
 #include <cmath>
+#include <chrono>
 #include <iostream>
 
 namespace Utils
@@ -217,4 +218,9 @@ namespace Utils
         return gradient;
     }
 
+    uint64_t micros()
+    {
+        using namespace std::chrono;
+        return duration_cast<microseconds>(system_clock::now().time_since_epoch()).count();
+    };
 };

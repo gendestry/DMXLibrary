@@ -3,6 +3,7 @@
 #include <unordered_map>
 #include <iostream>
 #include "LightGroup.h"
+#include "../Utils/Utils.h"
 
 namespace Effect
 {
@@ -20,29 +21,58 @@ namespace Effect
     {
         EffectType m_Type;
         EffectFn m_Fun;
+        uint64_t oldMicros = Utils::micros();
+        int step = 0;
+        float bpm;
 
-        Effect(EffectType type, EffectFn fun) : m_Type(type), m_Fun(fun) {}
+        bool shouldUpdate()
+        {
+            float freq = 1000000.f / bpm;
+            auto microst = Utils::micros();
+            auto dt = microst - oldMicros;
+            // std::cout << "BPM: " << bpm;
+
+            if (dt > freq)
+            {
+                oldMicros = microst;
+                // std::cout << "  " << dt << std::endl;
+                return true;
+            }
+
+            // std::cout << std::endl;
+
+            return false;
+        }
+
+        Effect(EffectType type, EffectFn fun, float speedBPM) : m_Type(type), m_Fun(fun), bpm(speedBPM)
+        {
+        }
 
         int getType() const { return (int)m_Type; }
         void apply(LightGroup &group, std::string groupName, EffectParams &params)
         {
+            if (shouldUpdate())
+            {
+                step++;
+            }
+            params.step = step;
             applyFunctionToLights(group, groupName, params, m_Fun);
         }
     };
 
     struct IntensityEffect : public Effect
     {
-        IntensityEffect(EffectFn fun) : Effect(Intensity, fun) {}
+        IntensityEffect(EffectFn fun, float speedBPM = 60.f) : Effect(Intensity, fun, speedBPM) {}
     };
 
     struct ColorEffect : public Effect
     {
-        ColorEffect(EffectFn fun) : Effect(Color, fun) {}
+        ColorEffect(EffectFn fun, float speedBPM = 60.f) : Effect(Color, fun, speedBPM) {}
     };
 
     struct OtherEffect : public Effect
     {
-        OtherEffect(EffectFn fun) : Effect(Other, fun) {}
+        OtherEffect(EffectFn fun, float speedBPM = 60.f) : Effect(Other, fun, speedBPM) {}
     };
 
     struct FX
@@ -93,5 +123,4 @@ namespace Effect
     };
 
     // struct IntensityEffect : public Effect {};
-
 };

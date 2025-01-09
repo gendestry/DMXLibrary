@@ -16,7 +16,7 @@ namespace Effect
 {
     struct EffectParams
     {
-        int globalSize = -1, offsetGlobal = 0, localSize = -1, localId = -1, tick;
+        int globalSize = -1, offsetGlobal = 0, localSize = -1, localId = -1, tick, step = 0;
         void *other;
         EffectParams(int tick = 0, void *other = nullptr) : tick(tick), other(other) {}
     };
