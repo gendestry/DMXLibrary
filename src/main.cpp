@@ -62,7 +62,7 @@ int main()
         ParamsPtr *ptr = (ParamsPtr *)params.other;
         int numSegments = ptr->numSegments;
         int segmentSize = ptr->segmentSize;
-        Utils::SegmentOptions opt = Utils::SegmentOptions::Saw;
+        Utils::SegmentOptions opt = Utils::SegmentOptions::Sin;
         int index = params.offsetGlobal + params.localId;
         int step = params.step;
         int n = params.globalSize;
@@ -141,14 +141,14 @@ int main()
     ColorEffect cRedBlueFx(colorRedBlue, 60);
     ColorEffect cGradientFx(colorGradient, 60);
     ColorEffect cSingleColorFx(colorSingleColor);
-    OtherEffect oColoriseFx(coloriseLambda, 120);
+    OtherEffect oColoriseFx(coloriseLambda);
 
     FX fx;
     fx.add<Intensity>(&iMasterFx);
     fx.add<Color>(&cRedBlueFx);
 
     FX fx2;
-    fx2.add<Intensity>(&iSnakeFx);
+    fx2.add<Intensity>(&iMasterFx);
     fx2.add<Color>(&cRedBlueFx);
 
     // fx2.add<Color>(&cSingleColorFx);
@@ -157,7 +157,7 @@ int main()
     fx3.add<Other>(&oColoriseFx);
 
     EffectParams params;
-    ParamsPtr ptr = {0.8f, 1, 7, {80, 200, 140}};
+    ParamsPtr ptr = {0.8f, 1, 8, {80, 200, 140}};
     params.other = (void *)&ptr;
     // // get current time millis
     for (int i = 0;; i++)

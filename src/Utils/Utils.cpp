@@ -153,10 +153,12 @@ namespace Utils
             for (int j = 0; j < segmentSize; j++)
             {
                 int index = (tail + j) % totalSize;
-                float step = ((j+1) / (float)segmentSize);
+                float step = ((j) / (float)(segmentSize - 1));
                 if (opt == Sin)
                 {
-                    segments[index] = cos(M_PI * step);
+                    // float angleNormalised = (step * M_PI) / 180.f;
+                    // float angle = angleNormalised * 170.f + 5.f;
+                    segments[index] = sin(step * M_PI);
                 }
                 else if (opt == Saw)
                 {
