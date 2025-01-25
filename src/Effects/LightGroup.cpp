@@ -65,30 +65,4 @@ namespace Effect
         return true;
     }
 
-    // bool applyFunctionToGlobalLights(std::vector<std::vector<Light *>> lights, std::string groupName, EffectParams params, EffectFn fun)
-    // {
-    //     params.globalSize = 0;
-    //     params.offsetGlobal = 0;
-
-    //     for (auto &group : lights)
-    //     {
-    //         for (auto &light : group)
-    //         {
-    //             params.globalSize += (*light)[groupName].size();
-    //         }
-    //     }
-
-    //     for (auto &group : lights)
-    //     {
-    //         for (auto &light : group)
-    //         {
-    //             if (!(*light).applyFunctionToAllGroups(groupName, params, fun))
-    //                 return false;
-    //             params.offsetGlobal += (*light)[groupName].size();
-    //         }
-    //     }
-
-    //     return true;
-    // }
-
 };

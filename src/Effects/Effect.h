@@ -1,7 +1,6 @@
 #pragma once
 #include <vector>
 #include <unordered_map>
-#include <iostream>
 #include "LightGroup.h"
 #include "../Utils/Utils.h"
 
@@ -53,7 +52,6 @@ namespace Effect
                 step++;
             }
             params.step = step;
-            // params.globalSize = group.getGlobalGroupSize(groupName);
             applyFunctionToLights(group, groupName, params, m_Fun);
         }
     };
@@ -92,23 +90,18 @@ namespace Effect
         void apply(LightGroup &group, std::string name, EffectParams &params)
         {
             std::vector<Effect *> effects = get<Intensity>();
-            // std::cout << "Applying intensity effects " << effects.size() << std::endl;
             for (Effect *effect : effects)
             {
                 effect->apply(group, name, params);
             }
 
             effects = get<Color>();
-
-            // std::cout << "Applying color effects " << effects.size() << std::endl;
             for (Effect *effect : effects)
             {
                 effect->apply(group, name, params);
             }
 
             effects = get<Other>();
-
-            // std::cout << "Applying other effects " << effects.size() << std::endl;
             for (Effect *effect : effects)
             {
                 effect->apply(group, name, params);

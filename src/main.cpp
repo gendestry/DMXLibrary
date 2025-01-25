@@ -2,11 +2,6 @@
 #include <thread>
 #include <chrono>
 #include <cmath>
-#include <memory>
-#include "DMX/Universe.h"
-#include "Effects/LightGroup.h"
-#include "Effects/Effect.h"
-#include "Utils/Utils.h"
 #include "Examples/Functions.h"
 #include "Engine/Engine.h"
 
