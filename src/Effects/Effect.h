@@ -31,7 +31,7 @@ namespace Effect
             auto dt = microst - oldMicros;
 
             float timePerBeat = 1000000.f / (bpm / 60.f);
-            float updateInterval =  timePerBeat / globalSize;
+            float updateInterval = timePerBeat / globalSize;
             if (dt > updateInterval)
             {
                 oldMicros = microst;
@@ -75,11 +75,7 @@ namespace Effect
 
     struct FX
     {
-        // DMX::LightGroup group;
         std::unordered_map<EffectType, std::vector<Effect *>> map;
-        // std::vector<Effect*> effects;
-
-        // FX(LightGroup &grp) : group(grp) {}
 
         template <EffectType eType>
         void add(Effect *effect)
