@@ -30,9 +30,9 @@ bin/libDMX.a: bin/Utils.o bin/Light.o bin/Universe.o bin/Effects.o bin/Engine.o 
 	@ar rcs $@ $^
 
 
-bin/main: bin/libDMX.a src/main.cpp | bin
+bin/main: src/main.cpp bin/libDMX.a | bin
 	@echo "Compiling..."
-	@g++  -O3 -I./src/ -L./bin/ -lDMX --std=c++20 src/main.cpp -o $@
+	@g++ $< -o $@ -O3 -L./bin/ -lDMX --std=c++20
 
 # FILES = $(wildcard src/**/*.cpp)
 

@@ -32,16 +32,16 @@ int main()
     engine["all"] += engine["pars"];
     engine["all"] -= engine["ledbar"];
 
-    IntensityEffect iSnakeFx(intensitySnake, 20);
+    IntensityEffect iSnakeFx(intensitySnake, 180);
     IntensityEffect iMasterFx(intensityMaster);
     IntensityEffect iOddEvenFx(intensityOddEven);
-    ColorEffect cRedBlueFx(colorRedBlue, 60);
+    ColorEffect cRedBlueFx(colorRedBlue, 200);
     ColorEffect cGradientFx(colorGradient, 30);
     ColorEffect cSingleColorFx(colorSingleColor);
     OtherEffect oColoriseFx(coloriseLambda);
 
     EffectParams params;
-    ParamsPtr ptr = {0.8f, 5, 10, {80, 200, 140}};
+    ParamsPtr ptr = {0.8f, 2, 25, {80, 200, 140}};
     params.other = (void *)&ptr;
 
     engine.getFX("fx1").add<Intensity>(&iMasterFx);
